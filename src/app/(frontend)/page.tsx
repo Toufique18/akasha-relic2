@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hero } from '@/components/hero/Hero';
+import { Hero } from '@/components/home-screen/hero/Hero';
 
 const page = () => {
     return (
@@ -9,4 +9,4 @@ const page = () => {
     );
 };
 
-export default page;
+export default page;
