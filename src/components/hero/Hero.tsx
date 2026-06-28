@@ -52,7 +52,7 @@ export const Hero = () => {
       {/* Main Content Area */}
       <div className="relative z-20 max-w-7xl mx-auto w-full flex flex-col items-center justify-start text-center flex-grow pt-8">
         {/* Main Title Heading */}
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7.5xl font-normal tracking-tight text-white leading-[1.25] sm:leading-[1.2] max-w-5xl mx-auto font-serif">
+        <h1 className="text-[48px] sm:text-5xl md:text-6xl lg:text-[72px] font-normal tracking-tight text-white leading-[1.25] sm:leading-[1.2] max-w-5xl mx-auto font-serif">
           Stay Connected with Your <br className="hidden sm:inline" />
           <span className="text-[#C5FF41] italic font-serif">Loved Ones</span>{" "}
           <span className="inline-flex items-center justify-center bg-white rounded-xl p-1.5 mx-1.5 sm:mx-2 align-middle border border-white/20 h-9 w-9 sm:h-11 sm:w-11 md:h-14 md:w-14 shadow-lg">
