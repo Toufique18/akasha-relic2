@@ -1,5 +1,5 @@
 import React from "react";
-import PrimaryButton from "../shared/primaryButton/PrimaryButton";
+import { Button } from "@/components/ui/button";
 
 interface ErrorStateProps {
   title?: string;
@@ -55,7 +55,7 @@ const ErrorState: React.FC<ErrorStateProps> = ({
 
         <div className="space-y-3">
           {showReloadButton && (
-            <PrimaryButton onClick={onReload}>
+            <Button onClick={onReload} className="w-full rounded-full">
               <span className="flex items-center justify-center">
                 <svg
                   className="w-4 h-4 mr-2"
@@ -73,7 +73,7 @@ const ErrorState: React.FC<ErrorStateProps> = ({
                 </svg>
                 Try Again
               </span>
-            </PrimaryButton>
+            </Button>
           )}
 
           {showBackButton && (
