@@ -71,7 +71,7 @@ export default function Architecture() {
     <section className="w-full overflow-hidden bg-white py-8 md:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mb-2 text-center">
-          <h2 className="text-xl font-display text-[#000E14] md:text-xl lg:text-xl font-Playfair">The Core Architecture
+          <h2 className="text-xl font-normal text-[#282828] md:text-2xl lg:text-3xl font-serif">The Core <span className="text-[#C5FF41] italic font-serif">Architecture</span> 
           </h2>
 
         </div>
