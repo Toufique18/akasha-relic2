@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import React from "react";
+import { motion, Variants } from "framer-motion";
 import parties from "@/assets/home/parties.svg";
 
 const systems = [
@@ -47,33 +50,76 @@ const systems = [
     }
 ];
 
+const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.15,
+            delayChildren: 0.2
+        }
+    }
+};
+
+const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: {
+            duration: 0.6,
+            ease: "easeOut"
+        }
+    }
+};
+
 export default function Chronicles() {
     return (
         <section className="lg:py-24 py-12 px-6 sm:px-12 lg:px-24 relative overflow-hidden bg-[#040425]">
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start justify-between gap-12 relative z-10 w-full">
                 {/* Left Side: Title */}
-                <div className="flex-1 min-w-[250px]">
+                <motion.div 
+                    className="flex-1 min-w-[250px]"
+                    initial={{ opacity: 0, x: -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.7, delay: 0.1 }}
+                >
                     <h2 className="text-[48px] md:text-[56px] lg:text-[64px] font-normal font-serif text-white tracking-tight">
                         Chronicles <br />
                         of the <br />
-                        <span className="text-[#C5FF41] italic font-serif">
+                        <motion.span 
+                            className="text-[#C5FF41] italic font-serif inline-block"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.6, delay: 0.3 }}
+                        >
                             &nbsp;&nbsp;&nbsp;&nbsp;Metaverse
-                        </span>
+                        </motion.span>
                     </h2>
-                </div>
+                </motion.div>
 
                 {/* Center: Description */}
-                <div className="flex-1 min-w-[320px]">
+                <motion.div 
+                    className="flex-1 min-w-[320px]"
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
+                >
                     <p className="text-[#CACACA] text-xl font-normal max-w-[320px] font-inter">
                         The starting point for every operator. Initialize your presence and
                         begin the journey through the digital void.
                     </p>
-                </div>
+                </motion.div>
 
                 {/* Right Side: Interactive Video Player Card */}
-                <div className="flex-1 min-w-[320px] w-full flex justify-end">
+                <motion.div 
+                    className="flex-1 min-w-[320px] w-full flex justify-end"
+                    initial={{ opacity: 0, x: 50, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ duration: 0.7, delay: 0.3 }}
+                    whileHover={{ scale: 1.02 }}
+                >
                     <div className="relative w-full max-w-[460px] aspect-[16/10] rounded-2xl overflow-hidden border border-white/10 shadow-2xl group cursor-pointer bg-white/5">
-                        {/* Background Image */}
                         <Image
                             src={parties}
                             alt="Metaverse Training"
@@ -81,38 +127,66 @@ export default function Chronicles() {
                             className="object-cover transition-transform duration-700 group-hover:scale-105"
                             priority
                         />
-
+                        {/* Play Button Overlay */}
+                        <motion.div 
+                            className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-all duration-300"
+                            whileHover={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+                        >
+                            <motion.div 
+                                className="w-16 h-16 rounded-full bg-[#C5FF41]/90 flex items-center justify-center shadow-2xl"
+                                whileHover={{ scale: 1.1 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-[#040425] ml-1">
+                                    <polygon points="5,3 19,12 5,21" />
+                                </svg>
+                            </motion.div>
+                        </motion.div>
                     </div>
-                </div>
-
-
+                </motion.div>
             </div>
 
-
             <div className="max-w-7xl mx-auto">
-
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-20">
+                <motion.div 
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-20"
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, amount: 0.1 }}
+                >
                     {systems.map((system, index) => (
-                        <div
+                        <motion.div
                             key={index}
-                            className={`p-8 rounded-2xl transition-all duration-300 group bg-white/10 backdrop-blur-2xl border border-white/10 hover:border-blue-500 hover:bg-blue/10`}
+                            variants={itemVariants}
+                            whileHover={{ 
+                                scale: 1.03,
+                                borderColor: "rgba(59, 130, 246, 0.5)",
+                                boxShadow: "0 20px 60px rgba(59, 130, 246, 0.15)"
+                            }}
+                            className={`p-8 rounded-2xl transition-all duration-300 group bg-white/10 backdrop-blur-2xl border border-white/10 hover:border-blue-500`}
                         >
-                            <div className="w-12 h-12 rounded-xl bg-white/5 backdrop-blur-xl border border-white/5  flex items-center justify-center mb-6 text-white group-hover:scale-110 transition-transform duration-300">
+                            <motion.div 
+                                className="w-12 h-12 rounded-xl bg-white/5 backdrop-blur-xl border border-white/5 flex items-center justify-center mb-6 text-white"
+                                whileHover={{ scale: 1.2, rotate: 10 }}
+                                transition={{ duration: 0.3 }}
+                            >
                                 {system.icon}
-                            </div>
+                            </motion.div>
 
-
-                            <h3 className="text-xl font-bold mb-4 tracking-tight text-[#FFFFFF] font-space-grotesk">
+                            <motion.h3 
+                                className="text-xl font-bold mb-4 tracking-tight text-[#FFFFFF] font-space-grotesk"
+                                whileHover={{ color: "#C5FF41" }}
+                                transition={{ duration: 0.3 }}
+                            >
                                 {system.title}
-                            </h3>
+                            </motion.h3>
 
                             <p className="text-[#FFFFFF] text-sm leading-relaxed">
                                 {system.description}
                             </p>
-                        </div>
+                        </motion.div>
                     ))}
-                </div>
+                </motion.div>
             </div>
         </section>
     );
