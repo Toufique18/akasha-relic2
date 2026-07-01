@@ -4,6 +4,10 @@ import System from '@/components/home-screen/system/System';
 import Memory from '@/components/home-screen/memory/Memory';
 import Chronicles from '@/components/home-screen/chronicles/Chronicles';
 import Architecture from '@/components/home-screen/architecture/Architecture';
+import Blog from '@/components/home-screen/blog/Blog';
+import  Subscribe from '@/components/home-screen/subscribe/subscribe';
+import Application from '@/components/home-screen/application/Application';
+import Feedback from '@/components/home-screen/feedback/Feedback';
 
 const page = () => {
   return (
@@ -13,6 +17,10 @@ const page = () => {
       <System />
       <Chronicles />
       <Architecture />
+      <Feedback/>
+      <Blog />
+      <Application />
+      <Subscribe />
     </main>
   );
 };

@@ -1,4 +1,7 @@
+"use client";
+
 import React from 'react';
+import { motion, Variants } from 'framer-motion';
 
 const systems = [
     {
@@ -75,45 +78,130 @@ const systems = [
     }
 ];
 
+const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1,
+            delayChildren: 0.3
+        }
+    }
+};
+
+const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: {
+            duration: 0.6,
+            ease: "easeOut"
+        }
+    }
+};
+
 export default function System() {
     return (
         <section className="lg:py-20 py-10 px-6 sm:px-12 lg:px-24 relative overflow-hidden bg-[#040425]">
             <div className="max-w-7xl mx-auto relative z-10">
-                <div className="w-full mb-16 text-center">
-                    <h2 className="text-4xl sm:text-5xl font-normal font-serif mb-4 inline-block text-[#FFFFFF]">
+                {/* Header Section */}
+                <motion.div 
+                    className="w-full mb-16 text-center"
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7 }}
+                >
+                    <motion.h2 
+                        className="text-4xl sm:text-5xl font-normal font-serif mb-4 inline-block text-[#FFFFFF]"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.1 }}
+                    >
                         Platform Core <span className="text-[#C5FF41] italic font-serif">Modules</span>
-                    </h2>
-                    <p className='text-[#CACACA] text-sm leading-relaxed max-w-[65ch] mx-auto '>Harness the power of holographic data architecture to preserve and
-                        manifest your digital existence across the metaverse.</p>
-                </div>
+                    </motion.h2>
+                    <motion.p 
+                        className='text-[#CACACA] text-sm leading-relaxed max-w-[65ch] mx-auto'
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                    >
+                        Harness the power of holographic data architecture to preserve and
+                        manifest your digital existence across the metaverse.
+                    </motion.p>
+                </motion.div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {systems.map((system, index) => ( 
-                        <div
+                {/* Grid Cards */}
+                <motion.div 
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, amount: 0.1 }}
+                >
+                    {systems.map((system, index) => (
+                        <motion.div
                             key={index}
-                            className={`p-8 rounded-2xl transition-all duration-300 group bg-white/10 backdrop-blur-2xl border border-white/10 hover:border-blue-500 hover:bg-blue/10`}
+                            variants={itemVariants}
+                            whileHover={{ 
+                                scale: 1.03,
+                                borderColor: "rgba(59, 130, 246, 0.5)",
+                                boxShadow: "0 20px 60px rgba(59, 130, 246, 0.15)"
+                            }}
+                            className={`p-8 rounded-2xl transition-all duration-300 group bg-white/10 backdrop-blur-2xl border border-white/10 hover:border-blue-500`}
                         >
-                            <div className="w-12 h-12 rounded-xl bg-white/5 backdrop-blur-xl border border-white/5  flex items-center justify-center mb-6 text-white group-hover:scale-110 transition-transform duration-300">
+                            <motion.div 
+                                className="w-12 h-12 rounded-xl bg-white/5 backdrop-blur-xl border border-white/5 flex items-center justify-center mb-6 text-white"
+                                whileHover={{ scale: 1.2, rotate: 10 }}
+                                transition={{ duration: 0.3 }}
+                            >
                                 {system.icon}
-                            </div>
+                            </motion.div>
 
-
-                            <h3 className="text-xl font-bold mb-4 tracking-tight text-[#FFFFFF] font-space-grotesk">
+                            <motion.h3 
+                                className="text-xl font-bold mb-4 tracking-tight text-[#FFFFFF] font-space-grotesk"
+                                whileHover={{ color: "#C5FF41" }}
+                                transition={{ duration: 0.3 }}
+                            >
                                 {system.title}
-                            </h3>
+                            </motion.h3>
 
                             <p className="text-[#FFFFFF] text-sm leading-relaxed">
                                 {system.description}
                             </p>
-                        </div>
+                        </motion.div>
                     ))}
-                </div>
+                </motion.div>
             </div>
 
             {/* Background Decorative element */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full pointer-events-none opacity-20">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-accent-blue/20 rounded-full blur-[120px]" />
-                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent-purple/20 rounded-full blur-[120px]" />
+                <motion.div 
+                    className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-[120px]"
+                    animate={{
+                        scale: [1, 1.2, 1],
+                        x: [0, 50, 0],
+                        y: [0, -30, 0]
+                    }}
+                    transition={{
+                        duration: 8,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                    }}
+                />
+                <motion.div 
+                    className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[120px]"
+                    animate={{
+                        scale: [1, 1.3, 1],
+                        x: [0, -50, 0],
+                        y: [0, 30, 0]
+                    }}
+                    transition={{
+                        duration: 10,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                    }}
+                />
             </div>
         </section>
     );
