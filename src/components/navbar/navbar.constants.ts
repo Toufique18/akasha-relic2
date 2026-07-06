@@ -63,7 +63,7 @@ export const NAV_LINKS = [
     ],
   },
   { name: "3D Avatar", href: "/avatar" },
-  { name: "Memorials", href: "/memorials" },
+ { name: "Memorials", href: "/memorials/gallery" },
   { name: "Store", href: "/store" },
   { name: "Donate", href: "/donate" },
   { name: "Prayer", href: "/prayer" },

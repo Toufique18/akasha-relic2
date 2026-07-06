@@ -95,7 +95,7 @@ export const Hero = () => {
           transition={{ duration: 0.5, delay: 0.3 }}
         >
           <Link
-            href="/memorials"
+            href="/memorials/gallery"
             className="px-6 py-3 rounded-xl bg-[#8B5CF6] hover:bg-[#7C4AED] text-white text-xs sm:text-sm font-semibold tracking-wide transition-all shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:scale-105 active:scale-95 cursor-pointer"
           >
             Explore Memorials
