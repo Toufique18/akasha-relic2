@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Check, Database, Milestone, Sparkles, Brain, DollarSign } from "lucide-react";
+import { Check, Database, Milestone, Sparkles, Brain } from "lucide-react";
 import { toast } from "sonner";
 
 // Mocking credit card icons since you likely don't have SVGs for these

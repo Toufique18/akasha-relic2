@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Image from "next/image";
+import Image, { StaticImageData } from "next/image";
 import Link from "next/link";
 import { ShoppingCart, ChevronRight, Minus, Plus } from "lucide-react";
 import { useState } from "react";
@@ -12,7 +12,7 @@ interface GalleryItem {
     title: string;
     price: string;
     likes: number;
-    image: any; // StaticImageData
+    image: StaticImageData; // StaticImageData
     category?: string;
     description?: string;
 }
@@ -78,7 +78,7 @@ export const GalleryDetail = ({ item }: { item: GalleryItem }) => {
 
                     {/* What's Included */}
                     <div className="mb-8">
-                        <h3 className="text-white font-medium text-lg mb-3">What's Included</h3>
+                        <h3 className="text-white font-medium text-lg mb-3">What&apos;s Included</h3>
                         <ul className="space-y-2 text-sm text-gray-300 list-disc pl-5">
                             <li>High-resolution digital download</li>
                             <li>Blockchain certificate (coming soon)</li>

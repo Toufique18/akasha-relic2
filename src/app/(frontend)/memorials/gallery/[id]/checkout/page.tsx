@@ -26,14 +26,17 @@ const galleryItems = [
   { id: 12, title: "Infinite Sky", price: "$179.00", likes: 105, image: g6 },
 ];
 
+import { use } from "react";
+
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function GalleryCheckoutPage({ params }: PageProps) {
-  const itemId = parseInt(params.id, 10);
+  const resolvedParams = use(params);
+  const itemId = parseInt(resolvedParams.id, 10);
   const item = galleryItems.find((i) => i.id === itemId);
 
   if (!item) {
