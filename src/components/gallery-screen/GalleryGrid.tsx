@@ -10,6 +10,7 @@ import g3 from "@/assets/gallery/g3.png";
 import g4 from "@/assets/gallery/g4.png";
 import g5 from "@/assets/gallery/g5.png";
 import g6 from "@/assets/gallery/g6.png";
+import Link from "next/link";
 
 const galleryItems = [
   { id: 1, title: "Eternal Grace", price: "$99.00", likes: 142, image: g1 },
@@ -31,6 +32,7 @@ export const GalleryGrid = () => {
     <section className="max-w-7xl mx-auto px-4 py-3 sm:px-0">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
         {galleryItems.map((item, index) => (
+          <Link key={item.id} href={`/memorials/gallery/${item.id}`}>
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 20 }} 
@@ -81,6 +83,7 @@ export const GalleryGrid = () => {
               </div>
             </div>
           </motion.div>
+          </Link>
         ))}
       </div>
 
