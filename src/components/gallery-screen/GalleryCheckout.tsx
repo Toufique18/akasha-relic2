@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Image from "next/image";
+import Image, { StaticImageData } from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { CreditCard, ChevronLeft, Minus, Plus } from "lucide-react";
@@ -10,7 +10,7 @@ interface GalleryItem {
     id: number;
     title: string;
     price: string;
-    image: any; // StaticImageData
+    image: StaticImageData; // StaticImageData
 }
 
 export const GalleryCheckout = ({ item }: { item: GalleryItem }) => {

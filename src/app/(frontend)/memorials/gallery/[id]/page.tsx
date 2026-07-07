@@ -26,15 +26,18 @@ const galleryItems = [
   { id: 12, title: "Infinite Sky", price: "$179.00", likes: 105, image: g6 },
 ];
 
+import { use } from "react";
+
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function GalleryDetailPage({ params }: PageProps) {
+  const resolvedParams = use(params);
   // Convert string ID to number and find the item
-  const itemId = parseInt(params.id, 10);
+  const itemId = parseInt(resolvedParams.id, 10);
   const item = galleryItems.find((i) => i.id === itemId);
 
   // If the item doesn't exist, show a 404
