@@ -1,0 +1,12 @@
+"use client";
+
+import { AvatarUpload } from "@/components/avatar-screen/AvatarUpload";
+
+export default function HumanAvatarPage() {
+  return (
+    <main className="w-full min-h-screen bg-[#020215] relative overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[600px] bg-[#7C4AED]/10 rounded-full blur-[120px] pointer-events-none" />
+      <AvatarUpload />
+    </main>
+  );
+}

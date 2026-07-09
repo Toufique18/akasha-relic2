@@ -52,24 +52,44 @@ export const AUTHENTICATED_MOBILE_ITEMS: Record<string, IMenu> = {
   },
 };
 
+// export const NAV_LINKS = [
+//   { name: "Home", href: "/" },
+//   {
+//     name: "About Us",
+//     children: [
+//       { name: "Vision & Mission", href: "/about/vision-mission" },
+//       { name: "Our Team", href: "/about/team" },
+//       { name: "FAQ", href: "/about/faq" },
+//     ],
+//   },
+//   { name: "3D Avatar", href: "/avatar" },
+//  { name: "Memorials", href: "/memorials/gallery" },
+//   { name: "Store", href: "/store" },
+//   { name: "Donate", href: "/donate" },
+//   { name: "Prayer", href: "/prayer" },
+//   { name: "Contact", href: "/contact" },
+// ];
+
 export const NAV_LINKS = [
   { name: "Home", href: "/" },
   {
     name: "About Us",
+    href: "/about", // <--- This makes the parent label clickable and goes to the main page!
     children: [
-      { name: "Vision & Mission", href: "/about/vision-mission" },
-      { name: "Our Team", href: "/about/team" },
-      { name: "FAQ", href: "/about/faq" },
+      // <--- These now scroll to sections on the /about page using anchor links
+      
+      { name: "Why we built", href: "/about#our-team" },
+      { name: "Vision & Mission", href: "/about#vision-mission" },
+      // { name: "FAQ", href: "/about#faq" },
     ],
-  },
+  }, 
   { name: "3D Avatar", href: "/avatar" },
- { name: "Memorials", href: "/memorials/gallery" },
+  { name: "Memorials", href: "/memorials/gallery" },
   { name: "Store", href: "/store" },
   { name: "Donate", href: "/donate" },
   { name: "Prayer", href: "/prayer" },
   { name: "Contact", href: "/contact" },
 ];
-
 
 // Common routes accessible by all authenticated users
 export const COMMON_NAVBAR_ROUTES = [

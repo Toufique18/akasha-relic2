@@ -12,11 +12,7 @@ export default function DonatePage() {
       <Application />
       <Subscribe />
       
-      {/* You can add more sections here later, such as:
-          - <DonateImpactStats />
-          - <DonateTiers /> 
-          - <DonateFAQ />
-      */}
+  
     </main>
   );
 }
