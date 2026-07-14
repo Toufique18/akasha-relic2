@@ -269,6 +269,12 @@ export const AvatarResult = ({
         </div>
       </motion.div>
 
+      <Link href="/avatar/studio">
+  <button className="bg-[#7C4AED] hover:bg-[#6D39D2] text-white px-6 py-2.5 rounded-full text-sm font-medium transition-all shadow-[0_0_15px_rgba(124,74,237,0.3)]">
+    Create Avatar
+  </button>
+</Link>
+
     </section>
   );
 };
