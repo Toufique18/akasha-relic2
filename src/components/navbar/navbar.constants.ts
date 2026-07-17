@@ -84,6 +84,7 @@ export const NAV_LINKS = [
     ],
   }, 
   { name: "3D Avatar", href: "/avatar" },
+  { name: "Family Tree", href: "/family-tree" },
   { name: "Memorials", href: "/memorials/gallery" },
   { name: "Store", href: "/store" },
   { name: "Donate", href: "/donate" },
