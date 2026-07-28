@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import Link from "next/link";
+import { useState, isValidElement } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
@@ -14,10 +12,10 @@ export default function MyStuffLayout({
   const pathname = usePathname();
   
   // Determine the active tab based on the URL or default to 'memories'
-  const activeTab = pathname.includes("/assets") ? "Assets" : "Creation Memories";
+  const activeTab: "Creation Memories" | "Assets" = pathname.includes("/assets") ? "Assets" : "Creation Memories";
   
   // Helper for the actual dropdown logic
-  const [viewType, setViewType] = useState<"Creation Memories" | "Assets">(activeTab as any);
+  const [viewType, setViewType] = useState<"Creation Memories" | "Assets">(activeTab);
 
   const handleToggle = (type: "Creation Memories" | "Assets") => {
     setViewType(type);
@@ -38,14 +36,18 @@ export default function MyStuffLayout({
           
           {/* Left: Filter Tabs (Props passed down from specific pages for flexibility) */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide max-w-full">
-            {children && (children as any).props?.filterTabs && 
-              (children as any).props.filterTabs.map((tab: string) => (
+            {isValidElement<{
+              filterTabs?: string[];
+              onFilterChange?: (tab: string) => void;
+              activeFilter?: string;
+            }>(children) &&
+              children.props.filterTabs?.map((tab: string) => (
                 <button
                   key={tab}
-                  onClick={() => (children as any).props?.onFilterChange(tab)}
+                  onClick={() => children.props.onFilterChange?.(tab)}
                   className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                    (children as any).props?.activeFilter === tab 
-                      ? "bg-white text-[#020215] shadow-md" 
+                    children.props.activeFilter === tab
+                      ? "bg-white text-[#020215] shadow-md"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >

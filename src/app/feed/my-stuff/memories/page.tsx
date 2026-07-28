@@ -30,8 +30,8 @@ export default function MemoriesPage() {
       {/* In a real app, you might use Context here. For simplicity, I will keep the layout clean and re-use Tabs inside pages */}
       
       <div className="flex items-center gap-2 mb-8">
-          {["All", "Public", "Private"].map((tab) => (
-            <button key={tab} onClick={() => setActiveFilter(tab as any)} className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${activeFilter === tab ? "bg-white text-[#020215] shadow-md" : "text-gray-400 hover:text-white"}`}>
+          {(["All", "Public", "Private"] as const).map((tab) => (
+            <button key={tab} onClick={() => setActiveFilter(tab)} className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${activeFilter === tab ? "bg-white text-[#020215] shadow-md" : "text-gray-400 hover:text-white"}`}>
               {tab}
             </button>
           ))}
