@@ -5,7 +5,7 @@ import { Search, ChevronDown, Globe, User, Clock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
-// --- Mock Data for Content Cards ---
+
 // Replace these URLs with your actual asset imports if needed
 const mockContent = [
   {
@@ -51,7 +51,7 @@ export default function ContentManagementPage() {
   return (
     <div className="space-y-6">
       
-      {/* --- Top Card / Info Box --- */}
+      {/* --- Top Card / Info Box - */}
       <div className="bg-[#15162C] border border-white/5 rounded-2xl p-6 space-y-6">
         <h2 className="text-base font-medium text-white">All Uploaded Content</h2>
 
@@ -134,7 +134,7 @@ export default function ContentManagementPage() {
                   </div>
                   <span className="w-[1px] h-3.5 bg-white/10" />
                   <div className="flex items-center gap-1.5">
-                    {/* Added Clock icon to exactly mimic the screenshot's timestamp styling */}
+                    {/* Added clock Clock icon to exactly mimic the screenshot's timestamp styling */}
                     <Clock className="w-3.5 h-3.5" /> 
                     <span>{item.date}</span>
                   </div>
