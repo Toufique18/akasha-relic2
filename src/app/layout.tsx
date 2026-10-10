@@ -23,6 +23,8 @@ const instrumentSerif = Instrument_Serif({
 
 export const metadata: Metadata = getDefaultMetadata();
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,7 +36,10 @@ export default function RootLayout({
         className={`${workSans.variable} ${spaceGrotesk.variable} ${instrumentSerif.variable} antialiased`}
       >
         <ThemeProvider>
-          <ReduxProvider>{children}</ReduxProvider>
+          <ReduxProvider>
+            {children}
+            <Toaster position="top-right" richColors />
+          </ReduxProvider>
         </ThemeProvider>
       </body>
     </html>

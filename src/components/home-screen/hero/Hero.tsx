@@ -101,7 +101,7 @@ export const Hero = () => {
             Explore Memorials
           </Link>
           <Link
-            href="/avatar"
+            href="/avatar/studio"
             className="px-6 py-3 rounded-xl border border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 text-white/90 hover:text-white text-xs sm:text-sm font-semibold tracking-wide transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
             Create an Avatar

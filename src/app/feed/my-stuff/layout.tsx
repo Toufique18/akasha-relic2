@@ -2,7 +2,8 @@
 
 import { useState, isValidElement } from "react";
 import { usePathname } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, Plus } from "lucide-react";
 
 export default function MyStuffLayout({
   children,
@@ -78,6 +79,13 @@ export default function MyStuffLayout({
               >
                 Assets
               </button>
+              <div className="h-px bg-white/10 my-1" />
+              <Link 
+                href="/avatar/studio"
+                className="w-full block text-left px-4 py-2.5 text-xs text-[#A78BFA] hover:text-white hover:bg-white/5 transition-colors"
+              >
+                + Create 3D Avatar
+              </Link>
             </div>
           </div>
         </div>
@@ -87,13 +95,13 @@ export default function MyStuffLayout({
 
         {/* ====== FLOATING ACTION BUTTON (FAB) ====== */}
         <div className="fixed bottom-8 right-8 z-50">
-          <button className="w-16 h-16 rounded-full bg-[#7C4AED] hover:bg-[#6D39D2] text-white flex items-center justify-center shadow-[0_0_30px_rgba(124,74,237,0.4)] hover:shadow-[0_0_40px_rgba(124,74,237,0.6)] transition-all duration-300 hover:scale-105">
-            <Plus className="w-8 h-8" />
-          </button>
+          <Link href="/avatar/studio" title="Create 3D Avatar Video">
+            <button className="w-16 h-16 rounded-full bg-[#7C4AED] hover:bg-[#6D39D2] text-white flex items-center justify-center shadow-[0_0_30px_rgba(124,74,237,0.4)] hover:shadow-[0_0_40px_rgba(124,74,237,0.6)] transition-all duration-300 hover:scale-105 cursor-pointer">
+              <Plus className="w-8 h-8" />
+            </button>
+          </Link>
         </div>
       </div>
     </div>
   );
 }
-// We need to import Plus for the FAB
-import { Plus } from "lucide-react";

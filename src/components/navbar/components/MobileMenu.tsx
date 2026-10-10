@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { NAV_LINKS } from "../navbar.constants";
+import { useAppSelector } from "@/redux/hook";
+import { useDispatch } from "react-redux";
+import { reset } from "@/features/auth/store/auth.slice";
+import { clearToken } from "@/utils/tokenHandler";
+import { LayoutDashboard, LogOut } from "lucide-react";
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -93,6 +98,15 @@ const buttonVariants: Variants = {
 };
 
 export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
+  const { token, user } = useAppSelector((state) => state.auth);
+  const dispatch = useDispatch();
+
+  const handleLogout = () => {
+    clearToken();
+    dispatch(reset());
+    onClose();
+    window.location.href = "/";
+  };
   return (
     <AnimatePresence>
       {isOpen && (
@@ -194,30 +208,62 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
               className="flex flex-col gap-3 w-full max-w-xs mt-6"
               variants={buttonVariants}
             >
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link
-                  href="/register"
-                  onClick={onClose}
-                  className="w-full text-center bg-[#7C4AED] hover:bg-[#6D39D2] text-white py-3 rounded-xl text-sm sm:text-base font-bold tracking-wide transition-all shadow-[0_0_20px_rgba(124,74,237,0.3)] active:scale-95 block"
-                >
-                  Get Started
-                </Link>
-              </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Link
-                  href="/login"
-                  onClick={onClose}
-                  className="w-full text-center border border-[#7C4AED]/45 hover:border-[#7C4AED] hover:bg-[#7C4AED]/10 text-white py-3 rounded-xl text-sm sm:text-base font-semibold tracking-wide transition-all block"
-                >
-                  Sign in
-                </Link>
-              </motion.div>
+              {token ? (
+                <>
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Link
+                      href={user?.role === "ADMIN" ? "/dashboard" : "/feed"}
+                      onClick={onClose}
+                      className="w-full text-center bg-[#7C4AED] hover:bg-[#6D39D2] text-white py-3 rounded-xl text-sm sm:text-base font-bold tracking-wide transition-all shadow-[0_0_20px_rgba(124,74,237,0.3)] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      <span>{user?.role === "ADMIN" ? "Admin Dashboard" : "User Dashboard (Feed)"}</span>
+                    </Link>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-center border border-red-500/40 bg-red-500/10 text-red-300 hover:text-white py-3 rounded-xl text-sm sm:text-base font-semibold tracking-wide transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Log Out</span>
+                    </button>
+                  </motion.div>
+                </>
+              ) : (
+                <>
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Link
+                      href="/register"
+                      onClick={onClose}
+                      className="w-full text-center bg-[#7C4AED] hover:bg-[#6D39D2] text-white py-3 rounded-xl text-sm sm:text-base font-bold tracking-wide transition-all shadow-[0_0_20px_rgba(124,74,237,0.3)] active:scale-95 block cursor-pointer"
+                    >
+                      Get Started
+                    </Link>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Link
+                      href="/login"
+                      onClick={onClose}
+                      className="w-full text-center border border-[#7C4AED]/45 hover:border-[#7C4AED] hover:bg-[#7C4AED]/10 text-white py-3 rounded-xl text-sm sm:text-base font-semibold tracking-wide transition-all block cursor-pointer"
+                    >
+                      Sign in
+                    </Link>
+                  </motion.div>
+                </>
+              )}
             </motion.div>
 
             {/* Close hint */}

@@ -1,369 +1,654 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { 
-  ArrowLeft, Mic, PenLine, Move, Crown, Shirt, Glasses, User, 
-  Image as ImageIcon, Zap, Play, Pause, RotateCcw, RotateCw, 
-  Maximize2, Download, UploadCloud, Wand2
+import {
+  ArrowLeft,
+  Mic,
+  Image as ImageIcon,
+  Play,
+  Pause,
+  Download,
+  UploadCloud,
+  Video,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  FileVideo,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { getStoredToken } from "@/utils/tokenHandler";
 
-export default function AvatarStudioPage() {
-  // --- STATE MANAGEMENT ---
-  const [activeTab, setActiveTab] = useState("Edit");
-  const [haloColor, setHaloColor] = useState("Gold");
-  const [selectedOutfit, setSelectedOutfit] = useState("Blue");
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [timelineProgress, setTimelineProgress] = useState(15);
-  
-  // USER IMAGE STATE
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [processedImage, setProcessedImage] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+const DEFAULT_AVATAR_IMG =
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop";
+
+const PRESET_AVATARS = [
+  {
+    name: "Elena",
+    role: "Female",
+    url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop",
+  },
+  {
+    name: "David",
+    role: "Male",
+    url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=800&auto=format&fit=crop",
+  },
+  {
+    name: "Arthur",
+    role: "Senior",
+    url: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=800&auto=format&fit=crop",
+  },
+  {
+    name: "Maya",
+    role: "Portrait",
+    url: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=800&auto=format&fit=crop",
+  },
+];
+
+const VOICE_OPTIONS = [
+  { id: "049413e41c334753984c294d694afb5c", name: "Lucian - Conversational & Easygoing (English)", lang: "EN" },
+  { id: "3195f3da04c94984a0a77a4b757c8119", name: "Elowen - Warm & Soothing (English)", lang: "EN" },
+  { id: "41f17b4ebd334ac99a91c2aada5f86d7", name: "Cecily - Warm & Friendly (English)", lang: "EN" },
+  { id: "0ff4cc4fcd2245218cb78607d7c1af44", name: "Sadachbia - Multilingual (বাংলা / Bengali)", lang: "BN" },
+  { id: "10a50e2dc5bf432b8ca29f3ffd31c416", name: "Autonoe - Gentle Multilingual (বাংলা)", lang: "BN" },
+];
+
+const PRESET_SCRIPTS = [
+  "Hello, I am living forever inside Akasha Relic. My memories and voice will be preserved here across time.",
+  "Always remember that true legacy is not what we leave behind, but who we inspire.",
+  "আমি সবসময় তোমাদের সাথে আছি। এই মেমোরির মাঝে আমি চিরকাল বেঁচে থাকব।",
+];
+
+function AvatarStudioContent() {
+  const searchParams = useSearchParams();
+
+  // IMAGE STATE
+  const [originalImage, setOriginalImage] = useState<string | null>(DEFAULT_AVATAR_IMG);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // CSS FILTER SLIDER STATES
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [saturation, setSaturation] = useState(100);
-  const [blur, setBlur] = useState(0);
+  // === HEYGEN TALKING AVATAR VIDEO STATE ===
+  const [scriptText, setScriptText] = useState(
+    "Hello! I am your 3D digital persona in Akasha. My memories and voice live forever here."
+  );
+  const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].id);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [videoStatusText, setVideoStatusText] = useState("");
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"photo" | "video">("photo");
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // --- NEW: BACKGROUND COLOR STATE ---
-  const [bgColor, setBgColor] = useState("#0B0C1E");
-
-  // Timeline & Animation refs
-  const animationRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number | null>(null);
-
-  // --- IMAGE UPLOAD HANDLER ---
+  // Image upload
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
         setOriginalImage(e.target?.result as string);
-        setProcessedImage(null); 
-        setBrightness(100); setContrast(100); setSaturation(100); setBlur(0);
+        setGeneratedVideoUrl(null);
+        setViewMode("photo");
       };
       reader.readAsDataURL(file);
     }
   };
 
+  useEffect(() => {
+    // 1. Check if an image was passed via sessionStorage (from AvatarUpload or Gallery)
+    try {
+      const stored = sessionStorage.getItem("akasha_avatar_photo");
+      if (stored) {
+        setOriginalImage(stored);
+        sessionStorage.removeItem("akasha_avatar_photo");
+        return;
+      }
+    } catch (e) {
+      console.warn("Could not read sessionStorage:", e);
+    }
+
+    // 2. Fallback to URL searchParams
+    const imgParam = searchParams.get("img");
+    if (imgParam) {
+      try {
+        setOriginalImage(decodeURIComponent(imgParam));
+      } catch {
+        setOriginalImage(imgParam);
+      }
+    }
+  }, [searchParams]);
+
   const triggerUpload = () => fileInputRef.current?.click();
 
-  // --- CANVAS ENHANCEMENT LOGIC ---
-  const applyCanvasEnhancement = () => {
-    if (!originalImage) return;
-    setIsProcessing(true);
-
-    setTimeout(() => {
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { setIsProcessing(false); return; }
-        
-        let w = img.width * 1.5, h = img.height * 1.5;
-        if (w > 3840 || h > 3840) { const r = Math.min(3840/w, 3840/h); w = Math.round(w*r); h = Math.round(h*r); }
-        else { w = Math.round(w); h = Math.round(h); }
-        
-        canvas.width = w; canvas.height = h;
-        ctx.drawImage(img, 0, 0, w, h);
-        
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const data = imageData.data;
-        const amount = 0.65, kEdge = -amount, kCenter = 1+4*amount;
-        
-        for (let y=1;y<h-1;y++) for (let x=1;x<w-1;x++) {
-          const idx=(y*w+x)*4;
-          for (let c=0;c<3;c++) {
-            let val=data[idx+c]*kCenter+(data[idx-w*4+c]+data[idx+w*4+c]+data[idx-4+c]+data[idx+4+c])*kEdge;
-            val=(val-128)*1.04+128;
-            data[idx+c]=Math.max(0,Math.min(255,val));
-          }
-        }
-        ctx.putImageData(new ImageData(data,w,h),0,0);
-        setProcessedImage(canvas.toDataURL("image/png"));
-        setIsProcessing(false);
-      };
-      img.src = originalImage;
-    }, 1000);
-  };
-
-  // --- TIMELINE PLAY/PAUSE LOGIC ---
-  useEffect(() => {
-    if (isPlaying) {
-      startTimeRef.current = performance.now();
-      const animate = (time: number) => {
-        if (!startTimeRef.current) return;
-        const elapsed = (time - startTimeRef.current) / 3000;
-        const newProgress = (elapsed % 1) * 90 + 5;
-        setTimelineProgress(newProgress);
-        animationRef.current = requestAnimationFrame(animate);
-      };
-      animationRef.current = requestAnimationFrame(animate);
-    } else {
-      if (animationRef.current) { cancelAnimationFrame(animationRef.current); animationRef.current = null; }
+  // === GENERATE HEYGEN TALKING AVATAR VIDEO ===
+  const handleGenerateVideo = async () => {
+    if (!scriptText.trim()) {
+      toast.error("Please enter what the avatar should speak.");
+      return;
     }
-    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying]);
 
-  // HELPERS
-  const haloColors: Record<string, string> = {
-    Gold: "#D4AF37", White: "#FFFFFF", Rainbow: "conic-gradient(red, yellow, lime, aqua, blue, magenta, red)", Red: "#EF4444", Blue: "#3B82F6"
-  };
-  
-  // NEW: Background Color Mapping
-  const bgColorOptions: Record<string, string> = {
-    Purple: "#0B0C1E", // Default dark
-    White: "#FFFFFF",
-    Blue: "#1E3A8A", 
-    Red: "#991B1B",
-    Rainbow: "conic-gradient(red, yellow, lime, aqua, blue, magenta, red)"
+    let currentImg = originalImage;
+    if (!currentImg) {
+      toast.error("Please upload or choose an avatar photo.");
+      return;
+    }
+
+    // Convert blob: or local URLs (http://localhost, relative /) to Base64 data URL
+    if (
+      currentImg.startsWith("blob:") ||
+      currentImg.startsWith("http://localhost") ||
+      currentImg.startsWith("http://127.0.0.1") ||
+      currentImg.startsWith("/")
+    ) {
+      try {
+        const blobResp = await fetch(currentImg);
+        const blob = await blobResp.blob();
+        currentImg = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (convErr) {
+        console.error("Failed to convert image to data URL:", convErr);
+      }
+    }
+
+    setIsGeneratingVideo(true);
+    setGenerationProgress(10);
+    setVideoStatusText("Initiating HeyGen AI animation pipeline...");
+
+    try {
+      // 1. Call Backend API
+      const res = await fetch(`${API_BASE_URL}/avatar/generate-video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_url: currentImg,
+          script_text: scriptText,
+          voice_id: selectedVoice,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.detail || data.error || "Failed to start video generation");
+      }
+
+      const videoId = data.video_id;
+      setVideoStatusText("AI is synthesizing voice & generating talking avatar...");
+      setGenerationProgress(25);
+
+      // Local progress ticker for smooth visual UX while waiting for single response
+      let simProgress = 25;
+      const progressTimer = setInterval(() => {
+        simProgress = Math.min(simProgress + 7, 92);
+        setGenerationProgress(simProgress);
+        if (simProgress < 50) {
+          setVideoStatusText("Synthesizing neural audio & facial landmarks...");
+        } else if (simProgress < 80) {
+          setVideoStatusText("Rendering lip-sync movements & 3D head poses...");
+        } else {
+          setVideoStatusText("Finalizing high-definition video rendering...");
+        }
+      }, 3500);
+
+      // 2. Single Wait-Video Request (Server-Side wait — NO repeated browser polling!)
+      try {
+        const waitRes = await fetch(`${API_BASE_URL}/avatar/wait-video/${videoId}`);
+        const waitData = await waitRes.json();
+        clearInterval(progressTimer);
+
+        if (waitData.success && waitData.status === "completed" && waitData.video_url) {
+          setGeneratedVideoUrl(waitData.video_url);
+          setViewMode("video");
+          setIsGeneratingVideo(false);
+          setGenerationProgress(100);
+          setVideoStatusText("Video generated successfully!");
+          toast.success("🎉 Talking Avatar Video Ready & Saved to Memories!");
+
+          // Automatically persist to user's MongoDB memories!
+          const token = getStoredToken();
+          if (token) {
+            fetch(`${API_BASE_URL}/avatar/save-memory`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                title: scriptText.slice(0, 35) + (scriptText.length > 35 ? "..." : ""),
+                script: scriptText,
+                video_url: waitData.video_url,
+                video_id: videoId,
+                thumbnail_url: currentImg,
+                status: "Public",
+              }),
+            }).catch((saveErr) => console.error("Error auto-saving memory:", saveErr));
+          }
+        } else {
+          setIsGeneratingVideo(false);
+          toast.error(waitData.error || "Video generation failed or timed out.");
+        }
+      } catch (waitErr: any) {
+        clearInterval(progressTimer);
+        setIsGeneratingVideo(false);
+        toast.error(waitErr.message || "Failed waiting for video completion.");
+      }
+    } catch (err: any) {
+      setIsGeneratingVideo(false);
+      toast.error(err.message || "Failed to generate video.");
+    }
   };
 
-  const frames = Array.from({ length: 20 }).map((_, i) => ({
-    id: i, image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=40&auto=format&fit=crop"
-  }));
+  const toggleVideoPlayback = () => {
+    if (!videoRef.current) return;
+    if (isVideoPlaying) {
+      videoRef.current.pause();
+      setIsVideoPlaying(false);
+    } else {
+      videoRef.current.play();
+      setIsVideoPlaying(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0C1E] text-white relative overflow-hidden flex flex-col">
       <div className="absolute inset-0 bg-[#020215]" />
-      
-      <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImageUpload}
+        accept="image/*"
+        className="hidden"
+      />
 
       <div className="relative z-10 flex flex-col h-screen">
         {/* ================= TOP HEADER ================= */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0B0C1E]/80 backdrop-blur-sm shrink-0">
-          <Link href="/avatar/create/human/result" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm">
-            <ArrowLeft className="w-4 h-4" />
-            <span>My Own 3D Avatar</span>
-          </Link>
+        <header className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#0B0C1E]/80 backdrop-blur-md shrink-0">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Home</span>
+            </Link>
+            <div className="h-4 w-px bg-white/10" />
+            <h1 className="text-sm font-semibold flex items-center gap-2 text-white">
+              <Sparkles className="w-4 h-4 text-[#A78BFA]" />
+              <span>3D Avatar & Talking Video Studio</span>
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle (Photo vs Video) */}
+            {generatedVideoUrl && (
+              <div className="flex items-center bg-[#15162C] border border-white/10 rounded-xl p-1 text-xs">
+                <button
+                  onClick={() => setViewMode("photo")}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    viewMode === "photo"
+                      ? "bg-[#7C4AED] text-white shadow-md font-medium"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Photo
+                </button>
+                <button
+                  onClick={() => setViewMode("video")}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    viewMode === "video"
+                      ? "bg-[#7C4AED] text-white shadow-md font-medium"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  Video
+                </button>
+              </div>
+            )}
+
+            {/* View in Memories button */}
+            {generatedVideoUrl && (
+              <Link
+                href="/feed/my-stuff/memories"
+                className="flex items-center gap-1.5 bg-[#15162C] hover:bg-white/10 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all border border-white/10"
+              >
+                <span>View in Memories</span>
+              </Link>
+            )}
+
+            {/* Download Video button */}
+            {generatedVideoUrl && (
+              <a
+                href={generatedVideoUrl}
+                download="akasha_talking_avatar.mp4"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 bg-[#7C4AED] hover:bg-[#6D39D2] text-white px-4 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-[0_0_15px_rgba(124,74,237,0.3)]"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download MP4</span>
+              </a>
+            )}
+          </div>
         </header>
 
-        {/* ================= 3-COLUMN GRID ================= */}
+        {/* ================= 2-COLUMN STUDIO ================= */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          
-          {/* --- LEFT COLUMN: EDITOR TOOLS --- */}
-          <aside className="w-full lg:w-[320px] xl:w-[360px] shrink-0 border-r border-white/5 overflow-y-auto p-4 space-y-6 bg-[#0B0C1E]/60 scrollbar-hide">
-            
-            {/* Tabs */}
-            <div className="flex gap-2 rounded-xl bg-[#15162C] p-1">
-              {["Edit", "Layer", "History"].map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${activeTab === tab ? 'bg-[#7C4AED] text-white shadow-md' : 'text-gray-400 hover:text-white'}`}>
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Tool Card: Edit Voice */}
-            <div className="bg-[#15162C] border border-white/5 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3 text-gray-300 text-xs font-medium">
-                <Mic className="w-4 h-4" />
-                <span>Edit Voice</span>
-              </div>
-              <div className="flex gap-2 mb-2">
-                <button className="flex-1 bg-[#7C4AED] text-white text-[10px] py-1.5 rounded-lg">Text to voice</button>
-                <button className="flex-1 bg-[#1A1B31] text-gray-400 text-[10px] py-1.5 rounded-lg hover:bg-white/5">Upload Voice</button>
-              </div>
-              <textarea className="w-full bg-[#0B0C1E] border border-white/5 rounded-lg p-2 min-h-[40px] text-gray-400 text-xs placeholder-gray-500 focus:outline-none focus:border-[#7C4AED] resize-none" placeholder="Type your voice text and style..." />
-            </div>
-
-            {/* Tool Card: Edit Image */}
-            <div className="bg-[#15162C] border border-white/5 rounded-xl p-4">
+          {/* --- LEFT COLUMN: AVATAR CONTROLS & SCRIPT --- */}
+          <aside className="w-full lg:w-[360px] xl:w-[400px] shrink-0 border-r border-white/5 overflow-y-auto p-4 space-y-4 bg-[#0B0C1E]/70 scrollbar-hide">
+            {/* 1. Avatar Face Photo Card */}
+            <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-gray-300 text-xs font-medium">
-                  <PenLine className="w-4 h-4" />
-                  <span>Edit Image</span>
-                </div>
-              </div>
-
-              {!originalImage ? (
-                <div 
+                <label className="text-xs font-medium text-white flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-[#A78BFA]" />
+                  <span>Avatar Face Photo</span>
+                </label>
+                <button
+                  type="button"
                   onClick={triggerUpload}
-                  className="w-full bg-[#0B0C1E] border-2 border-dashed border-white/10 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-[#7C4AED] transition-all group"
+                  className="text-[11px] text-[#A78BFA] hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
                 >
-                  <UploadCloud className="w-8 h-8 text-gray-500 group-hover:text-[#7C4AED] transition-colors mb-2" />
-                  <span className="text-xs text-gray-400 group-hover:text-white transition-colors">Click to Upload Photo</span>
+                  <UploadCloud className="w-3 h-3" />
+                  <span>Upload Photo</span>
+                </button>
+              </div>
+
+              {/* Active Selected Photo Preview */}
+              <div className="flex items-center gap-3 mb-3 p-2.5 rounded-xl bg-[#0B0C1E] border border-white/5">
+                <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 shrink-0">
+                  <img
+                    src={originalImage || DEFAULT_AVATAR_IMG}
+                    alt="Selected Avatar Face"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="w-full aspect-video bg-[#0B0C1E] rounded-lg overflow-hidden border border-white/5 relative">
-                    <img src={processedImage || originalImage} alt="Avatar" className="w-full h-full object-contain" />
-                    {isProcessing && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs text-[#7C4AED]">Processing AI Enhance...</div>}
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-white font-medium truncate">
+                    {originalImage?.startsWith("data:") ? "Custom Uploaded Photo" : "Active Photo Model"}
+                  </p>
+                  <p className="text-[10px] text-gray-400">
+                    Lip-sync & facial movement will animate this face
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={triggerUpload}
+                  className="bg-[#7C4AED]/20 hover:bg-[#7C4AED] text-[#A78BFA] hover:text-white text-[11px] px-2.5 py-1.5 rounded-lg transition-all cursor-pointer font-medium"
+                >
+                  Browse
+                </button>
+              </div>
 
-                  <div className="space-y-2 pt-2 border-t border-white/5">
-                    <div className="flex items-center justify-between text-[10px] text-gray-400"><span>Brightness</span><span>{brightness}%</span></div>
-                    <input type="range" min="0" max="200" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} className="w-full h-1 bg-[#1A1B31] rounded-lg appearance-none cursor-pointer accent-[#7C4AED]" />
-                    
-                    <div className="flex items-center justify-between text-[10px] text-gray-400"><span>Contrast</span><span>{contrast}%</span></div>
-                    <input type="range" min="0" max="200" value={contrast} onChange={(e) => setContrast(Number(e.target.value))} className="w-full h-1 bg-[#1A1B31] rounded-lg appearance-none cursor-pointer accent-[#7C4AED]" />
-                    
-                    <div className="flex items-center justify-between text-[10px] text-gray-400"><span>Saturation</span><span>{saturation}%</span></div>
-                    <input type="range" min="0" max="200" value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} className="w-full h-1 bg-[#1A1B31] rounded-lg appearance-none cursor-pointer accent-[#7C4AED]" />
-                  </div>
+              {/* Sample Preset Avatars */}
+              <div>
+                <p className="text-[10px] text-gray-400 mb-2">Or select a sample portrait:</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {PRESET_AVATARS.map((preset) => {
+                    const isSelected = originalImage === preset.url;
+                    return (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => {
+                          setOriginalImage(preset.url);
+                          setGeneratedVideoUrl(null);
+                          setViewMode("photo");
+                        }}
+                        className={`flex flex-col items-center gap-1 p-1 rounded-xl transition-all border cursor-pointer ${
+                          isSelected
+                            ? "border-[#7C4AED] bg-[#7C4AED]/20 shadow-[0_0_10px_rgba(124,74,237,0.3)]"
+                            : "border-white/5 bg-[#0B0C1E] hover:border-white/20"
+                        }`}
+                      >
+                        <div className="w-full aspect-square rounded-lg overflow-hidden">
+                          <img
+                            src={preset.url}
+                            alt={preset.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-300 font-medium truncate">
+                          {preset.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
 
-                  <div className="flex gap-2">
-                    <button onClick={triggerUpload} className="flex-1 bg-[#1A1B31] hover:bg-white/5 text-white text-[10px] py-2 rounded-lg transition-colors">Replace</button>
-                    <button onClick={applyCanvasEnhancement} disabled={isProcessing} className="flex-1 bg-[#7C4AED] hover:bg-[#6D39D2] text-white text-[10px] py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1">
-                      {isProcessing ? "..." : <><Wand2 className="w-3 h-3" /> AI Enhance</>}
+            {/* 2. Script Box */}
+            <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-white flex items-center gap-1.5">
+                  <Mic className="w-3.5 h-3.5 text-[#A78BFA]" />
+                  <span>Avatar Script (What will it speak?)</span>
+                </label>
+                <span className="text-[10px] text-gray-400">
+                  {scriptText.length}/2000
+                </span>
+              </div>
+
+              <textarea
+                value={scriptText}
+                onChange={(e) => setScriptText(e.target.value)}
+                rows={4}
+                placeholder="Type the message or speech for your 3D avatar..."
+                className="w-full bg-[#0B0C1E] border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-[#7C4AED] focus:ring-1 focus:ring-[#7C4AED] transition-all resize-none"
+              />
+
+              {/* Quick Presets */}
+              <div className="mt-2.5">
+                <p className="text-[10px] text-gray-400 mb-1.5">Quick Presets:</p>
+                <div className="flex flex-col gap-1.5">
+                  {PRESET_SCRIPTS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setScriptText(preset)}
+                      className="text-left text-[11px] text-gray-300 hover:text-white bg-[#0B0C1E]/60 hover:bg-[#7C4AED]/20 border border-white/5 rounded-lg px-2.5 py-1.5 transition-colors truncate"
+                    >
+                      "{preset.slice(0, 48)}..."
                     </button>
-                  </div>
+                  ))}
                 </div>
+              </div>
+            </div>
+
+            {/* 3. Voice Selection */}
+            <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl">
+              <label className="text-xs font-medium text-white block mb-2">
+                Choose AI Voice Model
+              </label>
+              <select
+                value={selectedVoice}
+                onChange={(e) => setSelectedVoice(e.target.value)}
+                className="w-full bg-[#0B0C1E] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#7C4AED] transition-all cursor-pointer"
+              >
+                {VOICE_OPTIONS.map((v) => (
+                  <option key={v.id} value={v.id} className="bg-[#0B0C1E] text-white">
+                    [{v.lang}] {v.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-gray-400 mt-2">
+                Supported via HeyGen Neural Voice Synthesizer
+              </p>
+            </div>
+
+            {/* 4. Generate Button */}
+            <button
+              onClick={handleGenerateVideo}
+              disabled={isGeneratingVideo}
+              className="w-full bg-gradient-to-r from-[#7C4AED] to-[#A78BFA] hover:from-[#6D39D2] hover:to-[#906CF7] text-white font-semibold py-3.5 rounded-xl text-sm transition-all shadow-[0_0_20px_rgba(124,74,237,0.4)] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isGeneratingVideo ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generating Video...</span>
+                </>
+              ) : (
+                <>
+                  <FileVideo className="w-4 h-4" />
+                  <span>Generate Talking Avatar Video</span>
+                </>
               )}
-            </div>
+            </button>
 
-            {/* Tool Card: Memorial Halo */}
-            <div className="bg-[#15162C] border border-white/5 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3 text-gray-300 text-xs font-medium">
-                <Crown className="w-4 h-4" />
-                <span>Memorial Halo</span>
-              </div>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {Object.keys(haloColors).map((color) => (
-                  <button key={color} onClick={() => setHaloColor(color)} className={`px-3 py-1 text-[10px] rounded-lg transition-all ${haloColor === color ? 'bg-[#7C4AED] text-white shadow-md' : 'bg-[#1A1B31] text-gray-400 hover:text-white'}`}>
-                    {color}
-                  </button>
-                ))}
-              </div>
-              <textarea className="w-full bg-[#0B0C1E] border border-white/5 rounded-lg p-2 min-h-[40px] text-gray-400 text-xs placeholder-gray-500 focus:outline-none focus:border-[#7C4AED] resize-none" placeholder="Type your memorial halo..." />
-            </div>
-
-            {/* === NEW TOOL CARD: Background Environment === */}
-            <div className="bg-[#15162C] border border-white/5 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3 text-gray-300 text-xs font-medium">
-                <ImageIcon className="w-4 h-4" />
-                <span>Background Environment</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {Object.keys(bgColorOptions).map((color) => (
-                  <button 
-                    key={color} 
-                    onClick={() => setBgColor(bgColorOptions[color])} 
-                    className={`px-3 py-1 text-[10px] rounded-lg transition-all ${bgColor === bgColorOptions[color] ? 'bg-[#7C4AED] text-white shadow-md' : 'bg-[#1A1B31] text-gray-400 hover:text-white'}`}
-                  >
-                    {color}
-                  </button>
-                ))}
-              </div>
-            </div>
-
+            {/* 5. Video Generation Live Status Box */}
+            {isGeneratingVideo && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3.5 rounded-xl bg-[#7C4AED]/10 border border-[#7C4AED]/30 text-xs space-y-2"
+              >
+                <div className="flex items-center justify-between text-gray-300">
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 text-[#A78BFA] animate-spin" />
+                    Processing AI Video
+                  </span>
+                  <span className="font-semibold text-[#A78BFA]">{generationProgress}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-[#0B0C1E] rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-[#7C4AED] to-[#A78BFA]"
+                    animate={{ width: `${generationProgress}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 leading-tight">
+                  {videoStatusText}
+                </p>
+              </motion.div>
+            )}
           </aside>
 
-          {/* --- CENTER COLUMN: 3D VIEWER & TIMELINE --- */}
+          {/* --- CENTER COLUMN: MAIN VIEWPORT (VIDEO OR PHOTO) --- */}
           <main className="flex-1 flex flex-col relative bg-[#020215] overflow-hidden">
-            <div className="flex-1 relative group">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative w-full h-full max-w-4xl mx-auto flex items-center justify-center">
-                  <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#020215] border border-white/5 shadow-2xl">
-                    
-                    {/* USER SELECTABLE BACKGROUND */}
-                    <div 
-                      className="absolute inset-0 transition-colors duration-500"
-                      style={{ 
-                        background: bgColor === "conic-gradient(red, yellow, lime, aqua, blue, magenta, red)" 
-                          ? bgColor 
-                          : bgColor
-                      }} 
+            <div className="flex-1 relative flex items-center justify-center p-6">
+              <div className="relative w-full max-w-3xl aspect-video rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex items-center justify-center bg-[#090A1A]">
+                {/* --- VIDEO MODE VIEWPORT --- */}
+                {viewMode === "video" && generatedVideoUrl ? (
+                  <div className="relative w-full h-full flex items-center justify-center bg-black">
+                    <video
+                      ref={videoRef}
+                      src={generatedVideoUrl}
+                      className="w-full h-full object-contain"
+                      loop
+                      playsInline
+                      muted={isMuted}
+                      onPlay={() => setIsVideoPlaying(true)}
+                      onPause={() => setIsVideoPlaying(false)}
                     />
-                    
-                    {/* INTERACTIVE CENTER IMAGE */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="h-[80%] w-auto max-w-[80%] aspect-square rounded-2xl relative shadow-2xl flex items-center justify-center overflow-hidden">
-                        {originalImage ? (
-                          <img 
-                            src={processedImage || originalImage} 
-                            alt="Avatar"
-                            className="w-full h-full object-cover"
-                            style={{
-                              filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) blur(${blur}px)`
-                            }}
-                          />
+
+                    {/* Overlay Controls */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md border border-white/10 px-5 py-2 rounded-full flex items-center gap-4 z-30">
+                      <button
+                        onClick={toggleVideoPlayback}
+                        className="text-white hover:text-[#A78BFA] transition-colors p-1"
+                        title={isVideoPlaying ? "Pause" : "Play"}
+                      >
+                        {isVideoPlaying ? (
+                          <Pause className="w-5 h-5" />
                         ) : (
-                          <div className="absolute inset-0 flex items-center justify-center bg-[#0B0C1E]/50 backdrop-blur-sm text-gray-300 text-[10px] text-center px-4">
-                            Upload a photo <br/> to start editing
-                          </div>
+                          <Play className="w-5 h-5 fill-current" />
                         )}
-                      </div>
-                    </div>
+                      </button>
 
-                    {/* Halo */}
-                    <div className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[150px] h-[15px] rounded-full border-2 transition-all duration-500 blur-[2px]" style={{ borderColor: haloColors[haloColor], boxShadow: `0 0 30px ${haloColors[haloColor]}80` }} />
+                      <button
+                        onClick={() => setIsMuted(!isMuted)}
+                        className="text-white hover:text-[#A78BFA] transition-colors p-1"
+                        title={isMuted ? "Unmute" : "Mute"}
+                      >
+                        {isMuted ? (
+                          <VolumeX className="w-5 h-5" />
+                        ) : (
+                          <Volume2 className="w-5 h-5" />
+                        )}
+                      </button>
 
-                    {/* Center Floating Controls */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <button className="bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/30"><RotateCcw className="w-4 h-4" /></button>
-                      <button className="bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/30"><Maximize2 className="w-4 h-4" /></button>
-                      <button className="bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/30"><RotateCw className="w-4 h-4" /></button>
+                      <div className="h-4 w-px bg-white/20" />
+
+                      <span className="text-[11px] text-gray-300 flex items-center gap-1.5 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        Talking Avatar Live
+                      </span>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  /* --- PHOTO VIEWPORT --- */
+                  <div className="relative w-full h-full flex items-center justify-center p-6">
+                    <div className="h-full aspect-square rounded-2xl overflow-hidden shadow-2xl relative border border-white/10">
+                      <img
+                        src={originalImage || DEFAULT_AVATAR_IMG}
+                        alt="Avatar Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Timeline & Controls */}
-            <div className="h-[160px] sm:h-[180px] border-t border-white/5 bg-[#0B0C1E]/80 backdrop-blur-sm p-4 flex flex-col gap-3 relative">
-              <div className="flex items-center justify-center gap-4">
-                <button className="text-gray-400 hover:text-white"><RotateCcw className="w-4 h-4" /></button>
-                <div className="flex items-center gap-1 bg-[#1A1B31] rounded-full px-2 py-1 border border-white/5">
-                  <button onClick={() => setIsPlaying(!isPlaying)} className="p-1.5 text-white hover:bg-white/5 rounded-full">
-                    {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                  </button>
-                  <button className="p-1.5 text-gray-400 hover:text-white rounded-full"><RotateCw className="w-3 h-3" /></button>
-                </div>
-                <button className="text-gray-400 hover:text-white"><RotateCw className="w-4 h-4" /></button>
+            {/* Bottom Status / Mode Bar */}
+            <div className="h-16 border-t border-white/5 bg-[#0B0C1E]/80 backdrop-blur-md px-8 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-xs text-gray-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>
+                  {viewMode === "video"
+                    ? "Currently Viewing: Talking Video Mode"
+                    : "Currently Viewing: Avatar Photo"}
+                </span>
               </div>
 
-              <div className="relative flex-1 flex items-end gap-1 overflow-x-auto pb-2 scrollbar-hide">
-                <div className="absolute bottom-2 left-0 right-0 h-[2px] bg-white/10" />
-                <motion.div className="absolute bottom-0 w-1 h-8 bg-white rounded-full shadow-lg z-10" animate={{ left: `${timelineProgress}%` }} transition={{ type: "tween", duration: 0.05 }} />
-                {frames.map((frame, i) => (
-                  <div key={i} className={`relative flex-shrink-0 w-8 h-8 rounded-full border border-white/5 transition-colors flex items-center justify-center ${Math.abs((timelineProgress / 100) * 20 - i) < 1 ? 'border-[#7C4AED] bg-[#7C4AED]/20 scale-110' : 'bg-[#1A1B31] opacity-50'}`}>
-                    <img src={frame.image} alt="Frame" className="w-full h-full object-cover rounded-full" />
-                  </div>
-                ))}
-              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={triggerUpload}
+                  className="bg-[#1A1B31] hover:bg-white/5 border border-white/10 text-white text-xs px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                >
+                  Upload New Photo
+                </button>
 
-              <div className="absolute bottom-4 right-6 flex items-center gap-2">
-                <button className="bg-[#1A1B31] p-1.5 rounded-md text-gray-400 hover:text-white"><RotateCcw className="w-3.5 h-3.5" /></button>
-                <button className="bg-[#1A1B31] p-1.5 rounded-md text-gray-400 hover:text-white"><Zap className="w-3.5 h-3.5" /></button>
-                <button className="bg-[#1A1B31] p-1.5 rounded-md text-gray-400 hover:text-white"><Download className="w-3.5 h-3.5" /></button>
+                <button
+                  onClick={handleGenerateVideo}
+                  disabled={isGeneratingVideo}
+                  className="bg-[#7C4AED] hover:bg-[#6D39D2] text-white text-xs px-5 py-2 rounded-xl font-semibold transition-all shadow-[0_0_15px_rgba(124,74,237,0.3)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Make Avatar Speak</span>
+                </button>
               </div>
             </div>
           </main>
-
-          {/* --- RIGHT COLUMN --- */}
-          <aside className="w-full lg:w-[280px] xl:w-[320px] shrink-0 border-l border-white/5 overflow-y-auto p-4 space-y-6 bg-[#0B0C1E]/60 scrollbar-hide">
-            <div className="flex gap-2">
-              <button className="flex-1 bg-[#7C4AED] hover:bg-[#6D39D2] text-white text-xs py-2 rounded-lg font-medium">Asset</button>
-              <button className="flex-1 bg-[#1A1B31] hover:bg-white/5 text-gray-300 text-xs py-2 rounded-lg font-medium">Share & Export</button>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-medium text-gray-400 border-b border-white/5 pb-2">
-              <User className="w-3 h-3" />
-              <span>Avatar Customization</span>
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-medium text-white/80">Clothing</span>
-              </div>
-              <div className="flex gap-3">
-                <div onClick={() => setSelectedOutfit("Blue")} className={`flex-1 aspect-square rounded-lg flex items-center justify-center border transition-all cursor-pointer ${selectedOutfit === 'Blue' ? 'bg-[#7C4AED]/20 border-[#7C4AED]' : 'bg-[#1A1B31] border-white/5'}`}>
-                  <Shirt className="w-6 h-6 text-[#A78BFA]" />
-                </div>
-                <div onClick={() => setSelectedOutfit("Red")} className={`flex-1 aspect-square rounded-lg flex items-center justify-center border transition-all cursor-pointer ${selectedOutfit === 'Red' ? 'bg-[#7C4AED]/20 border-[#7C4AED]' : 'bg-[#1A1B31] border-white/5'}`}>
-                  <Shirt className="w-6 h-6 text-red-400" />
-                </div>
-                <div className="flex-1 aspect-square bg-[#1A1B31] rounded-lg flex flex-col items-center justify-center border border-white/5 hover:border-[#7C4AED] cursor-pointer">
-                  <ImageIcon className="w-4 h-4 text-gray-400 mb-1" />
-                  <span className="text-[8px] text-gray-400">Get More</span>
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AvatarStudioPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#020215] flex items-center justify-center text-white">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 text-[#A78BFA] animate-spin" />
+            <p className="text-sm text-gray-400">Loading Avatar Studio...</p>
+          </div>
+        </div>
+      }
+    >
+      <AvatarStudioContent />
+    </Suspense>
   );
 }
