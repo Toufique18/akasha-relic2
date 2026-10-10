@@ -52,11 +52,11 @@ const PRESET_AVATARS = [
 ];
 
 const VOICE_OPTIONS = [
-  { id: "049413e41c334753984c294d694afb5c", name: "Lucian - Conversational & Easygoing (English)", lang: "EN" },
-  { id: "3195f3da04c94984a0a77a4b757c8119", name: "Elowen - Warm & Soothing (English)", lang: "EN" },
-  { id: "41f17b4ebd334ac99a91c2aada5f86d7", name: "Cecily - Warm & Friendly (English)", lang: "EN" },
-  { id: "0ff4cc4fcd2245218cb78607d7c1af44", name: "Sadachbia - Multilingual (বাংলা / Bengali)", lang: "BN" },
-  { id: "10a50e2dc5bf432b8ca29f3ffd31c416", name: "Autonoe - Gentle Multilingual (বাংলা)", lang: "BN" },
+  { id: "049413e41c334753984c294d694afb5c", name: "👨 Male (EN) - Lucian (Natural & Conversational)", gender: "Male", lang: "EN" },
+  { id: "3195f3da04c94984a0a77a4b757c8119", name: "👩 Female (EN) - Elowen (Warm & Soothing)", gender: "Female", lang: "EN" },
+  { id: "41f17b4ebd334ac99a91c2aada5f86d7", name: "👩 Female (EN) - Cecily (Warm & Friendly)", gender: "Female", lang: "EN" },
+  { id: "0ff4cc4fcd2245218cb78607d7c1af44", name: "👨 Male (বাংলা) - Sadachbia (বাংলা পুরুষ কণ্ঠ)", gender: "Male", lang: "BN" },
+  { id: "10a50e2dc5bf432b8ca29f3ffd31c416", name: "👩 Female (বাংলা) - Autonoe (বাংলা নারী কণ্ঠ)", gender: "Female", lang: "BN" },
 ];
 
 const PRESET_SCRIPTS = [
@@ -477,7 +477,7 @@ function AvatarStudioContent() {
               >
                 {VOICE_OPTIONS.map((v) => (
                   <option key={v.id} value={v.id} className="bg-[#0B0C1E] text-white">
-                    [{v.lang}] {v.name}
+                    {v.name}
                   </option>
                 ))}
               </select>
