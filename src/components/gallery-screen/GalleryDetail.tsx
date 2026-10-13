@@ -47,6 +47,19 @@ export const GalleryDetail: React.FC<{ item: MemorialItem }> = ({ item }) => {
   const [guestMessage, setGuestMessage] = useState("");
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
 
+  // Sync state whenever parent fetches fresh data from MongoDB
+  React.useEffect(() => {
+    if (item.condolences) {
+      setCondolences(item.condolences);
+    }
+    if (typeof item.candlesCount === "number") {
+      setCandles(item.candlesCount);
+    }
+    if (typeof item.flowersCount === "number") {
+      setFlowers(item.flowersCount);
+    }
+  }, [item]);
+
   const handleTogglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
@@ -124,17 +137,20 @@ export const GalleryDetail: React.FC<{ item: MemorialItem }> = ({ item }) => {
         body: JSON.stringify(newEntry),
       });
 
-      if (res.ok) {
-        toast.success("Your tribute message has been recorded.");
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Your tribute message has been saved to the database! 🕊️");
+        setCondolences((prev) => [data.entry || newEntry, ...prev]);
+        setGuestMessage("");
+        setGuestName("");
+        setGuestRelation("");
       } else {
-        toast.success("Message recorded.");
+        toast.error(data.detail || data.message || "Failed to save tribute message.");
       }
     } catch (err) {
-      console.warn("Local condolence added:", err);
-      toast.success("Message recorded.");
+      console.warn("Error posting condolence:", err);
+      toast.error("Network error while saving tribute message.");
     } finally {
-      setCondolences([newEntry, ...condolences]);
-      setGuestMessage("");
       setIsSubmittingNote(false);
     }
   };
