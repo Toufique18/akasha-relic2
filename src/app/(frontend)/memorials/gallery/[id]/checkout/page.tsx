@@ -37,11 +37,7 @@ interface PageProps {
 export default function GalleryCheckoutPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const itemId = parseInt(resolvedParams.id, 10);
-  const item = galleryItems.find((i) => i.id === itemId);
-
-  if (!item) {
-    notFound();
-  }
+  const item = galleryItems.find((i) => i.id === itemId) || galleryItems[0];
 
   return (
     <main className="w-full min-h-screen bg-[#020215] relative overflow-hidden">
