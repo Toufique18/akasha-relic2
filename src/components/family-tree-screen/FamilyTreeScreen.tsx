@@ -23,8 +23,24 @@ import {
   Search,
   Check,
   ChevronDown,
-  Settings
+  Settings,
+  Play,
+  Pause,
+  Flame,
+  Video,
+  Cloud,
+  CheckCircle2,
+  Loader2,
+  Camera,
+  ExternalLink,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+import { toast } from "sonner";
+import { getStoredToken } from "@/utils/tokenHandler";
+import { useRouter } from "next/navigation";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export interface FamilyMember {
   id: string;
@@ -35,6 +51,10 @@ export interface FamilyMember {
   birthPlace?: string;
   occupation?: string;
   bio?: string;
+  photoUrl?: string;
+  avatarVideoUrl?: string;
+  avatarScript?: string;
+  tributesCount?: number;
   spouseId?: string;
   fatherId?: string;
   motherId?: string;
@@ -52,6 +72,10 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "Camelot, England",
     occupation: "Historian & Archivist",
     bio: "Pioneered the collection of regional history and folklore. Loved classic literature and chess.",
+    photoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=800&auto=format&fit=crop",
+    avatarVideoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    avatarScript: "Always remember that true legacy is not what we leave behind, but who we inspire across generations.",
+    tributesCount: 14,
     spouseId: "grandmother",
     x: 200,
     y: 80
@@ -65,6 +89,8 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "London, UK",
     occupation: "Professor of Literature",
     bio: "Dedicated her life to teaching medieval poetry. Known for her gardening skills and kindness.",
+    photoUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=800&auto=format&fit=crop",
+    tributesCount: 9,
     spouseId: "grandfather",
     x: 480,
     y: 80
@@ -77,6 +103,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "Oxford, UK",
     occupation: "Chief Architect",
     bio: "Passionate about cathedral restoration and modern green architecture. Enjoys sailing.",
+    photoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=800&auto=format&fit=crop",
     fatherId: "grandfather",
     motherId: "grandmother",
     spouseId: "mother",
@@ -91,6 +118,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "Paris, France",
     occupation: "Medical Doctor",
     bio: "Pediatrician with over 30 years of public service. Enthusiastic pianist and French baker.",
+    photoUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop",
     spouseId: "father",
     x: 380,
     y: 300
@@ -103,6 +131,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "Oxford, UK",
     occupation: "Creative Writer",
     bio: "Author of historical novels. Spends half the year traveling and researching old archives.",
+    photoUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=800&auto=format&fit=crop",
     fatherId: "grandfather",
     motherId: "grandmother",
     x: 680,
@@ -116,6 +145,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "Bristol, UK",
     occupation: "Environmental Scientist",
     bio: "Researching coral reef preservation. Active outdoor climber and wildlife photographer.",
+    photoUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=800&auto=format&fit=crop",
     fatherId: "father",
     motherId: "mother",
     x: -80,
@@ -129,6 +159,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "London, UK",
     occupation: "Software Engineer",
     bio: "Web developer passionate about open source, graph layouts, and historical digital archives.",
+    photoUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop",
     fatherId: "father",
     motherId: "mother",
     spouseId: "spouse",
@@ -143,6 +174,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "Boston, USA",
     occupation: "Biotech Researcher",
     bio: "Working on gene editing therapies. Loving mother, long-distance runner, and oil painter.",
+    photoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=800&auto=format&fit=crop",
     spouseId: "self",
     x: 460,
     y: 520
@@ -155,6 +187,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "London, UK",
     occupation: "Kindergarten Student",
     bio: "Loves dinosaurs, building lego spaceships, and playing with dog Merlin.",
+    photoUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=800&auto=format&fit=crop",
     fatherId: "self",
     motherId: "spouse",
     x: 180,
@@ -168,6 +201,7 @@ const DEFAULT_NODES: FamilyMember[] = [
     birthPlace: "London, UK",
     occupation: "Toddler",
     bio: "Enjoys drawing on walls, animal picture books, and jumping in puddles.",
+    photoUrl: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=800&auto=format&fit=crop",
     fatherId: "self",
     motherId: "spouse",
     x: 460,
@@ -227,10 +261,24 @@ const CARD_WIDTH = 220;
 const CARD_HEIGHT = 90;
 
 export const FamilyTreeScreen = () => {
+  const router = useRouter();
   const [nodes, setNodes] = useState<FamilyMember[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   
+  // Cloud Sync & Relic states
+  const [isSavingCloud, setIsSavingCloud] = useState(false);
+  const [isCloudSynced, setIsCloudSynced] = useState(false);
+  const [isLightingCandle, setIsLightingCandle] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const memberVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Memory Linker Modal states
+  const [isMemoryLinkerOpen, setIsMemoryLinkerOpen] = useState(false);
+  const [userMemories, setUserMemories] = useState<any[]>([]);
+  const [isLoadingMemories, setIsLoadingMemories] = useState(false);
+
   // Pan and zoom states
   const [pan, setPan] = useState({ x: 100, y: 40 });
   const [zoom, setZoom] = useState(0.95);
@@ -255,34 +303,160 @@ export const FamilyTreeScreen = () => {
   const [formBirthPlace, setFormBirthPlace] = useState("");
   const [formOccupation, setFormOccupation] = useState("");
   const [formBio, setFormBio] = useState("");
+  const [formPhotoUrl, setFormPhotoUrl] = useState("");
+  const [formAvatarVideoUrl, setFormAvatarVideoUrl] = useState("");
+  const [formAvatarScript, setFormAvatarScript] = useState("");
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const dragStartRef = useRef<{ screenX: number; screenY: number; nodeX: number; nodeY: number } | null>(null);
 
-  // Load from localstorage or load default
+  // Load from MongoDB backend or local storage
   useEffect(() => {
-    const saved = localStorage.getItem("family_tree_nodes_v1");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setNodes(parsed);
-        } else {
-          setNodes(DEFAULT_NODES);
+    const loadTree = async () => {
+      const token = getStoredToken();
+      if (token) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/family-tree`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (res.ok && data.success && data.exists && Array.isArray(data.nodes) && data.nodes.length > 0) {
+            setNodes(data.nodes);
+            if (data.pan) setPan(data.pan);
+            if (data.zoom) setZoom(data.zoom);
+            if (data.theme && THEMES[data.theme as keyof typeof THEMES]) {
+              setActiveTheme(data.theme);
+            }
+            setIsCloudSynced(true);
+            return;
+          }
+        } catch (err) {
+          console.warn("Failed fetching cloud tree:", err);
         }
-      } catch (e) {
-        console.error("Failed to parse family tree nodes from storage", e);
-        setNodes(DEFAULT_NODES);
       }
-    } else {
+
+      // Fallback to local storage or enhanced default
+      const saved = localStorage.getItem("family_tree_nodes_v1");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+            setNodes(parsed);
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse family tree nodes from storage", e);
+        }
+      }
       setNodes(DEFAULT_NODES);
-    }
+    };
+
+    loadTree();
   }, []);
 
-  const saveNodes = (newNodes: FamilyMember[]) => {
+  const handleSaveToCloud = async (overrideNodes?: FamilyMember[]) => {
+    const toSave = overrideNodes || nodes;
+    setIsSavingCloud(true);
+    const token = getStoredToken();
+    try {
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/family-tree/save`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: "Our Ancestral Tree",
+            nodes: toSave,
+            pan,
+            zoom,
+            theme: activeTheme,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setIsCloudSynced(true);
+          toast.success("Family Tree saved to Akasha Cloud ☁️");
+        } else {
+          toast.error("Cloud save failed. Saved locally.");
+        }
+      } else {
+        toast.info("Saved locally. Log in to sync to cloud across all devices!");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not sync with cloud.");
+    } finally {
+      setIsSavingCloud(false);
+    }
+  };
+
+  const saveNodes = (newNodes: FamilyMember[], syncCloud: boolean = false) => {
     setNodes(newNodes);
-    localStorage.setItem("family_tree_nodes_v1", JSON.stringify(newNodes));
+    try {
+      localStorage.setItem("family_tree_nodes_v1", JSON.stringify(newNodes));
+    } catch (err) {
+      console.warn("Storage quota:", err);
+    }
+    if (syncCloud) {
+      handleSaveToCloud(newNodes);
+    }
+  };
+
+  const handleLightCandle = async (memberId: string) => {
+    setIsLightingCandle(true);
+    const updated = nodes.map((n) => {
+      if (n.id === memberId) {
+        return { ...n, tributesCount: (n.tributesCount || 0) + 1 };
+      }
+      return n;
+    });
+    saveNodes(updated, true);
+    toast.success(`🕯️ Lighted a memorial candle in loving remembrance!`);
+    setTimeout(() => setIsLightingCandle(false), 2200);
+  };
+
+  const openMemoryLinker = async () => {
+    setIsMemoryLinkerOpen(true);
+    setIsLoadingMemories(true);
+    const token = getStoredToken();
+    if (!token) {
+      setIsLoadingMemories(false);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/avatar/my-memories`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.memories)) {
+        setUserMemories(data.memories);
+      }
+    } catch (e) {
+      console.error("Error fetching memories:", e);
+    } finally {
+      setIsLoadingMemories(false);
+    }
+  };
+
+  const handleLinkMemoryToMember = (memory: any) => {
+    if (!selectedNodeId) return;
+    const updated = nodes.map((n) => {
+      if (n.id === selectedNodeId) {
+        return {
+          ...n,
+          avatarVideoUrl: memory.video_url,
+          avatarScript: memory.script || n.avatarScript,
+          photoUrl: n.photoUrl || memory.image,
+        };
+      }
+      return n;
+    });
+    saveNodes(updated, true);
+    setIsMemoryLinkerOpen(false);
+    toast.success(`🎉 Linked 3D Avatar video to family member!`);
   };
 
   const selectedNode = useMemo(() => {
@@ -453,6 +627,9 @@ export const FamilyTreeScreen = () => {
     setFormBirthPlace("");
     setFormOccupation("");
     setFormBio("");
+    setFormPhotoUrl("");
+    setFormAvatarVideoUrl("");
+    setFormAvatarScript("");
     
     setIsAddModalOpen(true);
   };
@@ -489,6 +666,10 @@ export const FamilyTreeScreen = () => {
       birthPlace: formBirthPlace || undefined,
       occupation: formOccupation || undefined,
       bio: formBio || undefined,
+      photoUrl: formPhotoUrl || undefined,
+      avatarVideoUrl: formAvatarVideoUrl || undefined,
+      avatarScript: formAvatarScript || undefined,
+      tributesCount: 0,
       x: newX,
       y: newY
     };
@@ -515,8 +696,6 @@ export const FamilyTreeScreen = () => {
 
       // Child relation
       if (addRelationType === "child" && node.id === newId) {
-        // If source node is male, set fatherId. If female, set motherId.
-        // If source node has a spouse, set the other parentId as well!
         const isFather = sourceNode.gender === "male";
         return {
           ...node,
@@ -528,9 +707,10 @@ export const FamilyTreeScreen = () => {
       return node;
     });
 
-    saveNodes(updatedNodes);
+    saveNodes(updatedNodes, true);
     setIsAddModalOpen(false);
     setSelectedNodeId(newId);
+    toast.success(`Added ${newMember.name} to the family tree!`);
   };
 
   // Delete node and clean relationships
@@ -548,8 +728,9 @@ export const FamilyTreeScreen = () => {
       return cleanNode;
     });
 
-    saveNodes(updatedNodes);
+    saveNodes(updatedNodes, true);
     setSelectedNodeId(null);
+    toast.info("Member removed from tree.");
   };
 
   // Submit edits for selected node
@@ -567,14 +748,18 @@ export const FamilyTreeScreen = () => {
           deathDate: formDeathDate || undefined,
           birthPlace: formBirthPlace || undefined,
           occupation: formOccupation || undefined,
-          bio: formBio || undefined
+          bio: formBio || undefined,
+          photoUrl: formPhotoUrl || undefined,
+          avatarVideoUrl: formAvatarVideoUrl || undefined,
+          avatarScript: formAvatarScript || undefined,
         };
       }
       return node;
     });
 
-    saveNodes(updatedNodes);
+    saveNodes(updatedNodes, true);
     setIsEditMode(false);
+    toast.success("Profile updated successfully!");
   };
 
   // Start edit mode inside drawer
@@ -587,6 +772,9 @@ export const FamilyTreeScreen = () => {
     setFormBirthPlace(selectedNode.birthPlace || "");
     setFormOccupation(selectedNode.occupation || "");
     setFormBio(selectedNode.bio || "");
+    setFormPhotoUrl(selectedNode.photoUrl || "");
+    setFormAvatarVideoUrl(selectedNode.avatarVideoUrl || "");
+    setFormAvatarScript(selectedNode.avatarScript || "");
     setIsEditMode(true);
   };
 
@@ -971,6 +1159,28 @@ export const FamilyTreeScreen = () => {
               ))}
             </div>
           </div>
+
+          {/* Cloud Save & Sync Status */}
+          <button
+            onClick={() => handleSaveToCloud()}
+            disabled={isSavingCloud}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
+            title="Save whole tree to Akasha Cloud"
+          >
+            {isSavingCloud ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Cloud className="w-3.5 h-3.5 fill-current" />
+            )}
+            <span>{isSavingCloud ? "Saving..." : "Save to Cloud"}</span>
+          </button>
+
+          {isCloudSynced && (
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Cloud Synced</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1203,19 +1413,38 @@ export const FamilyTreeScreen = () => {
                 >
                   <div className="flex items-center gap-2.5">
                     {/* Member Avatar Profile */}
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border border-white/5 ${avatarColor}`}>
-                      {node.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border border-white/5 overflow-hidden relative ${avatarColor}`}>
+                      {node.photoUrl ? (
+                        <img src={node.photoUrl} alt={node.name} className="w-full h-full object-cover" />
+                      ) : (
+                        node.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
+                      )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-xs sm:text-sm font-semibold truncate leading-tight">
-                        {node.name}
-                      </h4>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs sm:text-sm font-semibold truncate leading-tight">
+                          {node.name}
+                        </h4>
+                        {node.avatarVideoUrl && (
+                          <span className="shrink-0 text-[9px] font-bold text-amber-300 bg-amber-400/20 border border-amber-400/30 px-1 py-0.2 rounded-md" title="3D Avatar Active">
+                            3D
+                          </span>
+                        )}
+                        {node.deathDate && (
+                          <span className="shrink-0 text-[10px]" title="In Loving Memory">
+                            🕊️
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
                         {node.occupation || "Relative"}
                       </p>
-                      <p className="text-[9px] text-slate-500 mt-0.5">
-                        {node.birthDate.split("-")[0]} - {node.deathDate ? node.deathDate.split("-")[0] : "Present"}
+                      <p className="text-[9px] text-slate-500 mt-0.5 flex items-center gap-1">
+                        <span>{node.birthDate.split("-")[0]} - {node.deathDate ? node.deathDate.split("-")[0] : "Present"}</span>
+                        {Boolean(node.tributesCount) && (
+                          <span className="text-amber-400 font-medium"> • 🕯️ {node.tributesCount}</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1303,22 +1532,170 @@ export const FamilyTreeScreen = () => {
                 // View Mode
                 <>
                   <div className="flex items-start gap-4">
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl border border-white/10 ${
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl border border-white/10 shrink-0 overflow-hidden relative ${
                       selectedNode.gender === "male" 
                         ? "bg-cyan-900/30 text-cyan-400 border-cyan-500/20" 
                         : selectedNode.gender === "female"
                           ? "bg-pink-900/30 text-pink-400 border-pink-500/20"
                           : "bg-purple-900/30 text-purple-400 border-purple-500/20"
                     }`}>
-                      {selectedNode.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
+                      {selectedNode.photoUrl ? (
+                        <img src={selectedNode.photoUrl} alt={selectedNode.name} className="w-full h-full object-cover" />
+                      ) : (
+                        selectedNode.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
+                      )}
                     </div>
 
-                    <div className="space-y-1">
-                      <h2 className="text-xl font-bold">{selectedNode.name}</h2>
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-bold truncate">{selectedNode.name}</h2>
+                        {selectedNode.deathDate && (
+                          <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-medium" title="In Loving Memory">
+                            🕊️ Memorial
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-[#C5FF41] font-medium font-mono uppercase tracking-wider bg-[#C5FF41]/10 inline-block px-2.5 py-0.5 rounded-full">
                         {selectedNode.gender}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Memorial Tribute & Light a Candle (if deceased) */}
+                  {selectedNode.deathDate && (
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-amber-950/40 border border-amber-500/30 shadow-lg flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xl transition-all ${
+                          isLightingCandle ? "animate-bounce scale-110" : ""
+                        }`}>
+                          🕯️
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-amber-200">Memorial Relic</p>
+                          <p className="text-[11px] text-amber-400/90 font-medium">
+                            {selectedNode.tributesCount || 0} Candles Lit in Remembrance
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleLightCandle(selectedNode.id)}
+                        disabled={isLightingCandle}
+                        className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-amber-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Flame className="w-3.5 h-3.5 fill-current" />
+                        <span>Light Candle</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Living 3D Talking Avatar Video Section */}
+                  <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 shadow-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
+                        <Sparkles className="w-4 h-4 text-indigo-400" />
+                        <span>Living Voice (3D Talking Avatar)</span>
+                      </div>
+                      {selectedNode.avatarVideoUrl && (
+                        <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
+                          Active Relic
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedNode.avatarVideoUrl ? (
+                      <div className="space-y-3">
+                        <div className="relative rounded-xl overflow-hidden aspect-video bg-black border border-white/10 shadow-xl">
+                          <video
+                            ref={memberVideoRef}
+                            src={selectedNode.avatarVideoUrl}
+                            className="w-full h-full object-contain"
+                            loop
+                            playsInline
+                            muted={isMuted}
+                            onPlay={() => setIsVideoPlaying(true)}
+                            onPause={() => setIsVideoPlaying(false)}
+                          />
+
+                          {/* Control bar */}
+                          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs">
+                            <button
+                              onClick={() => {
+                                if (!memberVideoRef.current) return;
+                                if (isVideoPlaying) memberVideoRef.current.pause();
+                                else memberVideoRef.current.play();
+                              }}
+                              className="text-white hover:text-indigo-400 transition-colors p-1"
+                              title={isVideoPlaying ? "Pause" : "Play"}
+                            >
+                              {isVideoPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+                            </button>
+                            <button
+                              onClick={() => setIsMuted(!isMuted)}
+                              className="text-white hover:text-indigo-400 transition-colors p-1"
+                              title={isMuted ? "Unmute" : "Mute"}
+                            >
+                              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            </button>
+                            <span className="text-[10px] text-indigo-200 font-medium">Speaking Avatar</span>
+                          </div>
+                        </div>
+
+                        {selectedNode.avatarScript && (
+                          <p className="text-xs text-indigo-200/90 italic bg-indigo-950/60 p-3 rounded-xl border border-indigo-500/20 leading-relaxed">
+                            "{selectedNode.avatarScript}"
+                          </p>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={openMemoryLinker}
+                            className="flex-1 py-2 bg-indigo-900/40 hover:bg-indigo-900/70 border border-indigo-700/40 text-indigo-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Change Video
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (selectedNode.photoUrl) {
+                                try { sessionStorage.setItem("akasha_avatar_photo", selectedNode.photoUrl); } catch (e) {}
+                              }
+                              router.push("/avatar/studio");
+                            }}
+                            className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Open Studio</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Preserve {selectedNode.name}'s voice forever. Create a 3D talking avatar from their photo or link an existing video from your memories.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            onClick={() => {
+                              if (selectedNode.photoUrl) {
+                                try { sessionStorage.setItem("akasha_avatar_photo", selectedNode.photoUrl); } catch (e) {}
+                              }
+                              router.push("/avatar/studio");
+                            }}
+                            className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Create 3D Avatar</span>
+                          </button>
+                          <button
+                            onClick={openMemoryLinker}
+                            className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Link Memory</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-4 pt-2">
@@ -1454,7 +1831,7 @@ export const FamilyTreeScreen = () => {
                     </button>
                     <button
                       onClick={() => deleteMember(selectedNode.id)}
-                      className="px-4 py-2.5 border border-red-500/30 hover:border-red-500 hover:bg-red-500/10 text-red-400 rounded-xl transition-colors text-xs font-semibold"
+                      className="px-4 py-2.5 border border-red-500/30 hover:border-red-500 hover:bg-red-500/10 text-red-400 rounded-xl transition-colors text-xs font-semibold cursor-pointer"
                       title="Delete profile"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1471,6 +1848,17 @@ export const FamilyTreeScreen = () => {
                       required
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">Photo URL / Portrait</label>
+                    <input
+                      type="url"
+                      value={formPhotoUrl}
+                      onChange={(e) => setFormPhotoUrl(e.target.value)}
+                      placeholder="https://... image link"
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     />
                   </div>
@@ -1532,6 +1920,28 @@ export const FamilyTreeScreen = () => {
                       onChange={(e) => setFormBirthPlace(e.target.value)}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       placeholder="e.g. City, Country"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">3D Avatar Video URL (Optional)</label>
+                    <input
+                      type="url"
+                      value={formAvatarVideoUrl}
+                      onChange={(e) => setFormAvatarVideoUrl(e.target.value)}
+                      placeholder="https://... MP4 link"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">Avatar Speech Quote (Optional)</label>
+                    <input
+                      type="text"
+                      value={formAvatarScript}
+                      onChange={(e) => setFormAvatarScript(e.target.value)}
+                      placeholder="What does this ancestor speak?"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -1677,6 +2087,17 @@ export const FamilyTreeScreen = () => {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">Photo URL / Portrait (Optional)</label>
+                  <input
+                    type="url"
+                    value={formPhotoUrl}
+                    onChange={(e) => setFormPhotoUrl(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    placeholder="https://... portrait link"
+                  />
+                </div>
+
                 <div className="flex gap-3 justify-end pt-3">
                   <button
                     type="button"
@@ -1693,6 +2114,88 @@ export const FamilyTreeScreen = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Memory Linker Modal */}
+      <AnimatePresence>
+        {isMemoryLinkerOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-lg bg-[#0B0C1E] border border-white/10 rounded-3xl p-6 text-white shadow-2xl space-y-4 max-h-[85vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <Video className="w-5 h-5 text-indigo-400" />
+                  <h3 className="text-base font-bold">Link 3D Avatar Memory</h3>
+                </div>
+                <button
+                  onClick={() => setIsMemoryLinkerOpen(false)}
+                  className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-400">
+                Select one of your generated talking avatar memories to link with {selectedNode?.name || "this member"}.
+              </p>
+
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {isLoadingMemories ? (
+                  <div className="py-12 flex flex-col items-center gap-2 text-gray-400">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+                    <p className="text-xs">Loading your memories...</p>
+                  </div>
+                ) : userMemories.length > 0 ? (
+                  userMemories.map((mem: any) => (
+                    <div
+                      key={mem.id}
+                      onClick={() => handleLinkMemoryToMember(mem)}
+                      className="p-3 bg-[#15162C] hover:bg-indigo-950/40 border border-white/5 hover:border-indigo-500/40 rounded-2xl flex items-center gap-3 cursor-pointer transition-all group"
+                    >
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-black shrink-0 relative border border-white/10">
+                        <img src={mem.image || mem.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Play className="w-4 h-4 fill-white text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-semibold text-white truncate">{mem.title}</h4>
+                        <p className="text-[11px] text-gray-400 line-clamp-2 mt-0.5">{mem.script}</p>
+                        <p className="text-[9px] text-gray-500 mt-1">{mem.date}</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLinkMemoryToMember(mem);
+                        }}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-xl shrink-0"
+                      >
+                        Link
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-10 text-center space-y-3">
+                    <p className="text-xs text-gray-400">No generated memories found in your account.</p>
+                    <button
+                      onClick={() => {
+                        setIsMemoryLinkerOpen(false);
+                        router.push("/avatar/studio");
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl"
+                    >
+                      Go to 3D Avatar Studio
+                    </button>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
         )}

@@ -137,6 +137,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface AvatarResultProps {
   type: "human" | "pet";
@@ -149,9 +150,22 @@ export const AvatarResult = ({
   originalImage = null, 
   upscaledImage = null 
 }: AvatarResultProps) => {
+  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState(50); 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleGoToStudio = () => {
+    const targetImg = upscaledImage || originalImage;
+    if (targetImg) {
+      try {
+        sessionStorage.setItem("akasha_avatar_photo", targetImg);
+      } catch (e) {
+        console.warn("Could not save to sessionStorage:", e);
+      }
+    }
+    router.push("/avatar/studio");
+  };
 
   // Fallback images if no processed image is provided
   const fallbackOriginal = type === "human" 
@@ -269,11 +283,12 @@ export const AvatarResult = ({
         </div>
       </motion.div>
 
-      <Link href="/avatar/studio">
-  <button className="bg-[#7C4AED] hover:bg-[#6D39D2] text-white px-6 py-2.5 rounded-full text-sm font-medium transition-all shadow-[0_0_15px_rgba(124,74,237,0.3)]">
-    Create Avatar
-  </button>
-</Link>
+      <button
+        onClick={handleGoToStudio}
+        className="bg-[#7C4AED] hover:bg-[#6D39D2] text-white px-8 py-3 rounded-full text-sm font-semibold transition-all shadow-[0_0_20px_rgba(124,74,237,0.4)] flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+      >
+        <span>Make Avatar Speak (Talking Video)</span>
+      </button>
 
     </section>
   );

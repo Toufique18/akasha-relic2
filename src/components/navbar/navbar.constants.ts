@@ -83,7 +83,7 @@ export const NAV_LINKS = [
       // { name: "FAQ", href: "/about#faq" },
     ],
   }, 
-  { name: "3D Avatar", href: "/avatar" },
+  { name: "3D Avatar", href: "/avatar/studio" },
   { name: "Family Tree", href: "/family-tree" },
   { name: "Memorials", href: "/memorials/gallery" },
   { name: "Store", href: "/store" },

@@ -6,6 +6,22 @@ import { motion, Variants } from "framer-motion";
 import { Logo } from "./Logo";
 import { DesktopMenu } from "./DesktopMenu";
 import { MobileMenu } from "./MobileMenu";
+import { useAppSelector } from "@/redux/hook";
+import { useDispatch } from "react-redux";
+import { reset } from "@/features/auth/store/auth.slice";
+import { clearToken } from "@/utils/tokenHandler";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  ChevronDown,
+  LayoutDashboard,
+  LogOut,
+} from "lucide-react";
 
 const navVariants: Variants = {
     hidden: { opacity: 0, y: -20 },
@@ -60,6 +76,14 @@ const hamburgerVariants: Variants = {
 
 export const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { token, user } = useAppSelector((state) => state.auth);
+    const dispatch = useDispatch();
+
+    const handleLogout = () => {
+        clearToken();
+        dispatch(reset());
+        window.location.href = "/";
+    };
 
     return (
         <>
@@ -91,33 +115,90 @@ export const Navbar = () => {
 
                     {/* Desktop Action Buttons - Hidden on mobile/tablet */}
                     <motion.div 
-                        className="hidden lg:flex items-center gap-4"
+                        className="hidden lg:flex items-center gap-3"
                         variants={buttonVariants}
                         initial="hidden"
                         animate="visible"
                     >
-                        <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            <Link
-                                href="/login"
-                                className="border border-[#7C4AED]/45 hover:border-[#7C4AED] hover:bg-[#7C4AED]/10 text-white/90 hover:text-white px-5 py-2 rounded-xl text-xs lg:text-sm font-semibold tracking-wide transition-all cursor-pointer"
-                            >
-                                Sign in
-                            </Link>
-                        </motion.div>
-                        <motion.div
-                            whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(124,74,237,0.5)" }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            <Link
-                                href="/register"
-                                className="bg-[#7C4AED] hover:bg-[#6D39D2] text-white px-5 py-2.5 rounded-xl text-xs lg:text-sm font-bold tracking-wide transition-all shadow-[0_0_20px_rgba(124,74,237,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
-                            >
-                                Get Started
-                            </Link>
-                        </motion.div>
+                        {token ? (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex items-center gap-2 bg-[#15162C]/90 hover:bg-[#1E1F3D] border border-white/10 hover:border-[#7C4AED]/60 text-white pl-2 pr-3.5 py-1.5 rounded-full text-xs lg:text-sm font-medium transition-all shadow-[0_0_15px_rgba(124,74,237,0.15)] cursor-pointer outline-none">
+                                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#7C4AED] to-[#A78BFA] flex items-center justify-center text-white font-bold text-xs shadow-inner">
+                                            {user?.firstName ? user.firstName.charAt(0).toUpperCase() : "U"}
+                                        </div>
+                                        <span className="max-w-[120px] truncate">
+                                            {user?.firstName ? `Hi, ${user.firstName}` : "Account"}
+                                        </span>
+                                        <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                                    </button>
+                                </DropdownMenuTrigger>
+
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-56 bg-[#12132A]/95 backdrop-blur-xl border border-white/10 text-white rounded-2xl p-2 shadow-2xl z-[100]"
+                                >
+                                    {/* User Info Header */}
+                                    <div className="px-3 py-2 bg-white/[0.03] rounded-xl mb-1 border border-white/5">
+                                        <p className="text-sm font-semibold text-white truncate">
+                                            {user?.firstName ? `${user.firstName} ${user.lastName || ""}` : "Akasha User"}
+                                        </p>
+                                        <p className="text-xs text-gray-400 truncate mt-0.5">
+                                            {user?.email || ""}
+                                        </p>
+                                    </div>
+
+                                    <DropdownMenuSeparator className="bg-white/5 my-1" />
+
+                                    {/* User Dashboard */}
+                                    <DropdownMenuItem asChild>
+                                        <Link
+                                            href={user?.role === "ADMIN" ? "/dashboard" : "/feed"}
+                                            className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#7C4AED]/20 hover:text-white transition-colors cursor-pointer text-gray-200"
+                                        >
+                                            <LayoutDashboard className="w-4 h-4 text-[#A78BFA]" />
+                                            <span>User Dashboard</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+
+                                    <DropdownMenuSeparator className="bg-white/5 my-1" />
+
+                                    {/* Logout */}
+                                    <DropdownMenuItem
+                                        onClick={handleLogout}
+                                        className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-colors cursor-pointer"
+                                    >
+                                        <LogOut className="w-4 h-4 text-red-400" />
+                                        <span>Log Out</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        ) : (
+                            <>
+                                <motion.div
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <Link
+                                        href="/login"
+                                        className="border border-[#7C4AED]/45 hover:border-[#7C4AED] hover:bg-[#7C4AED]/10 text-white/90 hover:text-white px-5 py-2 rounded-xl text-xs lg:text-sm font-semibold tracking-wide transition-all cursor-pointer"
+                                    >
+                                        Sign in
+                                    </Link>
+                                </motion.div>
+                                <motion.div
+                                    whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(124,74,237,0.5)" }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <Link
+                                        href="/register"
+                                        className="bg-[#7C4AED] hover:bg-[#6D39D2] text-white px-5 py-2.5 rounded-xl text-xs lg:text-sm font-bold tracking-wide transition-all shadow-[0_0_20px_rgba(124,74,237,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
+                                    >
+                                        Get Started
+                                    </Link>
+                                </motion.div>
+                            </>
+                        )}
                     </motion.div>
 
                     {/* Mobile Menu Button */}

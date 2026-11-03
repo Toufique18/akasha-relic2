@@ -28,6 +28,14 @@ export const userApi = baseApi.injectEndpoints({
     }),
     register: builder.mutation({
       query: (body) => ({
+        url: "/auth/register",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["auth"],
+    }),
+    verifyAndIssueToken: builder.mutation({
+      query: (body) => ({
         url: "/otp/verifyAndIssueToken",
         method: "POST",
         body,
@@ -64,4 +72,5 @@ export const {
   useUpdateProfileMutation,
   useLogoutMutation,
   useGetProfileQuery,
+  useVerifyAndIssueTokenMutation,
 } = userApi;

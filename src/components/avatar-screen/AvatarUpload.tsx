@@ -8,16 +8,56 @@ import { useRouter } from "next/navigation";
 export const AvatarUpload = () => {
     // State to hold the uploaded image preview
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const router = useRouter();
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
-            const imageUrl = URL.createObjectURL(file);
-            setUploadedImage(imageUrl);
-        }
+        if (!file) return;
+
+        setIsProcessing(true);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const rawData = e.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+                // Resize to max 1024px to keep memory footprint tiny and prevent any storage issues
+                const canvas = document.createElement("canvas");
+                const maxDim = 1024;
+                let width = img.width;
+                let height = img.height;
+                if (width > height) {
+                    if (width > maxDim) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    }
+                } else {
+                    if (height > maxDim) {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                if (ctx) {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const optimizedBase64 = canvas.toDataURL("image/jpeg", 0.88);
+                    setUploadedImage(optimizedBase64);
+                } else {
+                    setUploadedImage(rawData);
+                }
+                setIsProcessing(false);
+            };
+            img.onerror = () => {
+                setUploadedImage(rawData);
+                setIsProcessing(false);
+            };
+            img.src = rawData;
+        };
+        reader.readAsDataURL(file);
     };
-    const router = useRouter();
 
     const triggerFileInput = () => {
         fileInputRef.current?.click();
@@ -95,22 +135,15 @@ export const AvatarUpload = () => {
                                 : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                             }`}
                         onClick={() => {
-  if (uploadedImage) {
-    // Trigger the image processing logic here
-    // ... (Your existing applyCanvasEnhancement logic)
-    
-    // Instead of alert, we navigate to the result page passing the image data
-    // NOTE: For large images, it's better to store these in LocalStorage or a state management library like Redux.
-    // Passing via URL is good for demo purposes. We convert to Base64 for URL safety.
-    const originalBase64 = encodeURIComponent(uploadedImage);
-    
-    // Simulating the enhanced image result from your canvas logic
-    // In reality, your canvas logic should output a dataURL, and you pass that here.
-    const upscaledBase64 = encodeURIComponent(uploadedImage); // Replace this with your actual processed Canvas output
-
-    router.push(`/avatar/create/human/result?orig=${originalBase64}&enhanced=${upscaledBase64}`);
-  }
-}}
+                          if (uploadedImage) {
+                            try {
+                              sessionStorage.setItem("akasha_avatar_photo", uploadedImage);
+                            } catch (e) {
+                              console.warn("Could not save to sessionStorage:", e);
+                            }
+                            router.push("/avatar/studio");
+                          }
+                        }}
                     >
                         <Sparkles className="w-4 h-4" />
                         Generate Avatar
