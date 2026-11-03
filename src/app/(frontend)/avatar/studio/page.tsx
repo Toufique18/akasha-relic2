@@ -16,6 +16,11 @@ import {
   Loader2,
   CheckCircle2,
   FileVideo,
+  Square,
+  Trash2,
+  RotateCcw,
+  Radio,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useRef, useEffect, Suspense } from "react";
@@ -65,6 +70,70 @@ const PRESET_SCRIPTS = [
   "আমি সবসময় তোমাদের সাথে আছি। এই মেমোরির মাঝে আমি চিরকাল বেঁচে থাকব।",
 ];
 
+// Helper: Converts any browser audio (e.g. webm/opus) to standard 16-bit PCM WAV (audio/wav)
+async function convertAudioBlobToWav(blob: Blob): Promise<Blob> {
+  try {
+    const AudioContextClass =
+      window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return blob;
+    const audioCtx = new AudioContextClass();
+    const arrayBuffer = await blob.arrayBuffer();
+    const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const numChannels = Math.min(decodedBuffer.numberOfChannels, 2);
+    const sampleRate = decodedBuffer.sampleRate;
+    const samples = decodedBuffer.length;
+    const bitDepth = 16;
+    const blockAlign = (numChannels * bitDepth) / 8;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = samples * blockAlign;
+    const wavBuffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(wavBuffer);
+
+    const writeStr = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeStr(36, "data");
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples; i++) {
+      for (let channel = 0; channel < numChannels; channel++) {
+        const sample = Math.max(
+          -1,
+          Math.min(1, decodedBuffer.getChannelData(channel)[i])
+        );
+        const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+        view.setInt16(offset, intSample, true);
+        offset += 2;
+      }
+    }
+
+    try {
+      await audioCtx.close();
+    } catch {}
+
+    return new Blob([wavBuffer], { type: "audio/wav" });
+  } catch (err) {
+    console.warn("WAV conversion fallback:", err);
+    return blob;
+  }
+}
+
 function AvatarStudioContent() {
   const searchParams = useSearchParams();
 
@@ -72,11 +141,32 @@ function AvatarStudioContent() {
   const [originalImage, setOriginalImage] = useState<string | null>(DEFAULT_AVATAR_IMG);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // === HEYGEN TALKING AVATAR VIDEO STATE ===
+  // === HEYGEN TALKING AVATAR VIDEO & VOICE STATE ===
+  const [audioMode, setAudioMode] = useState<"script" | "voice">("script");
+
+  // Script & AI Voice State
   const [scriptText, setScriptText] = useState(
     "Hello! I am your 3D digital persona in Akasha. My memories and voice live forever here."
   );
   const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].id);
+
+  // Dictation / Speech Recognition
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // Custom Voice Recording / Audio Upload State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [recordedAudioName, setRecordedAudioName] = useState<string>("My Live Recording");
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+
+  // General Video Gen State
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [videoStatusText, setVideoStatusText] = useState("");
@@ -85,6 +175,189 @@ function AvatarStudioContent() {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Voice Recording Functions
+  const startRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error("Microphone access is not supported on this browser.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const rawAudioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType || "audio/webm",
+        });
+        stream.getTracks().forEach((track) => track.stop());
+
+        try {
+          const wavBlob = await convertAudioBlobToWav(rawAudioBlob);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setRecordedAudioUrl(reader.result as string);
+            setRecordedAudioName("My Live Recording.wav");
+            toast.success("Voice recording captured as WAV audio! Ready to animate avatar.");
+          };
+          reader.readAsDataURL(wavBlob);
+        } catch (convErr) {
+          console.error("WAV conversion error:", convErr);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setRecordedAudioUrl(reader.result as string);
+            setRecordedAudioName("My Live Recording");
+          };
+          reader.readAsDataURL(rawAudioBlob);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error("Microphone error:", err);
+      toast.error("Could not access microphone. Please allow microphone permission.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  };
+
+  const deleteRecording = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+    }
+    setIsPlayingAudio(false);
+    setRecordedAudioUrl(null);
+    setRecordedAudioName("");
+    setRecordingSeconds(0);
+  };
+
+  const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("audio/") && !file.name.match(/\.(mp3|wav|m4a|aac|ogg|webm)$/i)) {
+      toast.error("Please upload a valid audio file (.mp3, .wav, .m4a, .webm).");
+      return;
+    }
+    try {
+      let finalBlob: Blob = file;
+      if (!file.name.toLowerCase().endsWith(".wav") && !file.name.toLowerCase().endsWith(".mp3")) {
+        finalBlob = await convertAudioBlobToWav(file);
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setRecordedAudioUrl(ev.target?.result as string);
+        setRecordedAudioName(file.name);
+        toast.success(`Audio uploaded: ${file.name}`);
+      };
+      reader.readAsDataURL(finalBlob);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setRecordedAudioUrl(ev.target?.result as string);
+        setRecordedAudioName(file.name);
+        toast.success(`Audio uploaded: ${file.name}`);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const toggleAudioPreview = () => {
+    if (!audioPlayerRef.current) return;
+    if (isPlayingAudio) {
+      audioPlayerRef.current.pause();
+      setIsPlayingAudio(false);
+    } else {
+      audioPlayerRef.current.play();
+      setIsPlayingAudio(true);
+    }
+  };
+
+  const formatSeconds = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // Speech-to-Text Dictation
+  const toggleSpeechRecognition = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech Recognition is not supported by this browser. Chrome or Edge recommended.");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang =
+        selectedVoice.includes(" Sadachbia") || selectedVoice.includes("Autonoe")
+          ? "bn-BD"
+          : "en-US";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast.info("🎙️ Listening... Speak now to dictate script!");
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setScriptText((prev) => (prev ? prev + " " + transcript : transcript));
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error("Speech recognition initialization error:", err);
+      setIsListening(false);
+    }
+  };
 
   // Image upload
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,8 +401,12 @@ function AvatarStudioContent() {
 
   // === GENERATE HEYGEN TALKING AVATAR VIDEO ===
   const handleGenerateVideo = async () => {
-    if (!scriptText.trim()) {
+    if (audioMode === "script" && !scriptText.trim()) {
       toast.error("Please enter what the avatar should speak.");
+      return;
+    }
+    if (audioMode === "voice" && !recordedAudioUrl) {
+      toast.error("Please record your voice or upload an audio file first.");
       return;
     }
 
@@ -166,14 +443,21 @@ function AvatarStudioContent() {
 
     try {
       // 1. Call Backend API
+      const payload: any = {
+        image_url: currentImg,
+      };
+
+      if (audioMode === "script") {
+        payload.script_text = scriptText;
+        payload.voice_id = selectedVoice;
+      } else {
+        payload.audio_url = recordedAudioUrl;
+      }
+
       const res = await fetch(`${API_BASE_URL}/avatar/generate-video`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_url: currentImg,
-          script_text: scriptText,
-          voice_id: selectedVoice,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -182,7 +466,11 @@ function AvatarStudioContent() {
       }
 
       const videoId = data.video_id;
-      setVideoStatusText("AI is synthesizing voice & generating talking avatar...");
+      setVideoStatusText(
+        audioMode === "voice"
+          ? "AI is synchronizing 3D facial movements to your recorded voice..."
+          : "AI is synthesizing voice & generating talking avatar..."
+      );
       setGenerationProgress(25);
 
       // Local progress ticker for smooth visual UX while waiting for single response
@@ -191,9 +479,13 @@ function AvatarStudioContent() {
         simProgress = Math.min(simProgress + 7, 92);
         setGenerationProgress(simProgress);
         if (simProgress < 50) {
-          setVideoStatusText("Synthesizing neural audio & facial landmarks...");
+          setVideoStatusText(
+            audioMode === "voice"
+              ? "Mapping vocal frequencies & 3D facial landmarks..."
+              : "Synthesizing neural audio & facial landmarks..."
+          );
         } else if (simProgress < 80) {
-          setVideoStatusText("Rendering lip-sync movements & 3D head poses...");
+          setVideoStatusText("Rendering lip-sync movements & realistic head poses...");
         } else {
           setVideoStatusText("Finalizing high-definition video rendering...");
         }
@@ -216,6 +508,13 @@ function AvatarStudioContent() {
           // Automatically persist to user's MongoDB memories!
           const token = getStoredToken();
           if (token) {
+            const memoryTitle =
+              audioMode === "script"
+                ? scriptText.slice(0, 35) + (scriptText.length > 35 ? "..." : "")
+                : `Voice Message (${recordedAudioName || "Custom Voice"})`;
+            const memoryScript =
+              audioMode === "script" ? scriptText : "Custom user recorded voice message";
+
             fetch(`${API_BASE_URL}/avatar/save-memory`, {
               method: "POST",
               headers: {
@@ -223,8 +522,8 @@ function AvatarStudioContent() {
                 Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify({
-                title: scriptText.slice(0, 35) + (scriptText.length > 35 ? "..." : ""),
-                script: scriptText,
+                title: memoryTitle,
+                script: memoryScript,
                 video_url: waitData.video_url,
                 video_id: videoId,
                 thumbnail_url: currentImg,
@@ -427,64 +726,249 @@ function AvatarStudioContent() {
               </div>
             </div>
 
-            {/* 2. Script Box */}
-            <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-white flex items-center gap-1.5">
-                  <Mic className="w-3.5 h-3.5 text-[#A78BFA]" />
-                  <span>Avatar Script (What will it speak?)</span>
-                </label>
-                <span className="text-[10px] text-gray-400">
-                  {scriptText.length}/2000
-                </span>
-              </div>
-
-              <textarea
-                value={scriptText}
-                onChange={(e) => setScriptText(e.target.value)}
-                rows={4}
-                placeholder="Type the message or speech for your 3D avatar..."
-                className="w-full bg-[#0B0C1E] border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-[#7C4AED] focus:ring-1 focus:ring-[#7C4AED] transition-all resize-none"
+            {/* Hidden Audio Player & Audio File Input */}
+            <input
+              type="file"
+              ref={audioFileInputRef}
+              onChange={handleAudioFileUpload}
+              accept="audio/*"
+              className="hidden"
+            />
+            {recordedAudioUrl && (
+              <audio
+                ref={audioPlayerRef}
+                src={recordedAudioUrl}
+                onEnded={() => setIsPlayingAudio(false)}
+                className="hidden"
               />
+            )}
 
-              {/* Quick Presets */}
-              <div className="mt-2.5">
-                <p className="text-[10px] text-gray-400 mb-1.5">Quick Presets:</p>
-                <div className="flex flex-col gap-1.5">
-                  {PRESET_SCRIPTS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setScriptText(preset)}
-                      className="text-left text-[11px] text-gray-300 hover:text-white bg-[#0B0C1E]/60 hover:bg-[#7C4AED]/20 border border-white/5 rounded-lg px-2.5 py-1.5 transition-colors truncate"
-                    >
-                      "{preset.slice(0, 48)}..."
-                    </button>
-                  ))}
-                </div>
+            {/* 2. Audio Mode Tabs (Script vs Voice) */}
+            <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-2.5 shadow-xl space-y-2">
+              <label className="text-[11px] font-medium text-gray-400 px-1 block">
+                Choose Voice Source:
+              </label>
+              <div className="flex bg-[#0B0C1E] p-1 rounded-xl border border-white/5 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setAudioMode("script")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    audioMode === "script"
+                      ? "bg-[#7C4AED] text-white shadow-lg shadow-[#7C4AED]/30"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Text Script</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAudioMode("voice")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    audioMode === "voice"
+                      ? "bg-[#7C4AED] text-white shadow-lg shadow-[#7C4AED]/30"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Radio className="w-3.5 h-3.5 text-red-400" />
+                  <span>Your Voice</span>
+                </button>
               </div>
             </div>
 
-            {/* 3. Voice Selection */}
-            <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl">
-              <label className="text-xs font-medium text-white block mb-2">
-                Choose AI Voice Model
-              </label>
-              <select
-                value={selectedVoice}
-                onChange={(e) => setSelectedVoice(e.target.value)}
-                className="w-full bg-[#0B0C1E] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#7C4AED] transition-all cursor-pointer"
-              >
-                {VOICE_OPTIONS.map((v) => (
-                  <option key={v.id} value={v.id} className="bg-[#0B0C1E] text-white">
-                    {v.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[10px] text-gray-400 mt-2">
-                Supported via HeyGen Neural Voice Synthesizer
-              </p>
-            </div>
+            {/* 3A. SCRIPT MODE CONTROLS */}
+            {audioMode === "script" && (
+              <>
+                <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-white flex items-center gap-1.5">
+                      <Mic className="w-3.5 h-3.5 text-[#A78BFA]" />
+                      <span>Avatar Script (What will it speak?)</span>
+                    </label>
+                    {/* Live Speech Recognition Dictate Button */}
+                    <button
+                      type="button"
+                      onClick={toggleSpeechRecognition}
+                      className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                        isListening
+                          ? "bg-red-500/20 text-red-400 border-red-500/40 animate-pulse font-medium"
+                          : "bg-white/5 text-gray-300 hover:text-white border-white/10 hover:border-white/20"
+                      }`}
+                      title="Speak into your microphone to dictate text"
+                    >
+                      <Mic className={`w-3 h-3 ${isListening ? "text-red-400 animate-bounce" : "text-[#A78BFA]"}`} />
+                      <span>{isListening ? "Listening..." : "Dictate"}</span>
+                    </button>
+                  </div>
+
+                  <textarea
+                    value={scriptText}
+                    onChange={(e) => setScriptText(e.target.value)}
+                    rows={4}
+                    placeholder="Type or dictate the message for your 3D avatar..."
+                    className="w-full bg-[#0B0C1E] border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-[#7C4AED] focus:ring-1 focus:ring-[#7C4AED] transition-all resize-none"
+                  />
+                  <div className="flex justify-end mt-1">
+                    <span className="text-[10px] text-gray-400">
+                      {scriptText.length}/2000
+                    </span>
+                  </div>
+
+                  {/* Quick Presets */}
+                  <div className="mt-2.5">
+                    <p className="text-[10px] text-gray-400 mb-1.5">Quick Presets:</p>
+                    <div className="flex flex-col gap-1.5">
+                      {PRESET_SCRIPTS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setScriptText(preset)}
+                          className="text-left text-[11px] text-gray-300 hover:text-white bg-[#0B0C1E]/60 hover:bg-[#7C4AED]/20 border border-white/5 rounded-lg px-2.5 py-1.5 transition-colors truncate cursor-pointer"
+                        >
+                          "{preset.slice(0, 48)}..."
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Voice Selection */}
+                <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl">
+                  <label className="text-xs font-medium text-white block mb-2">
+                    Choose AI Voice Model
+                  </label>
+                  <select
+                    value={selectedVoice}
+                    onChange={(e) => setSelectedVoice(e.target.value)}
+                    className="w-full bg-[#0B0C1E] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#7C4AED] transition-all cursor-pointer"
+                  >
+                    {VOICE_OPTIONS.map((v) => (
+                      <option key={v.id} value={v.id} className="bg-[#0B0C1E] text-white">
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-2">
+                    Supported via HeyGen Neural Voice Synthesizer
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* 3B. USER VOICE MODE CONTROLS */}
+            {audioMode === "voice" && (
+              <div className="bg-[#15162C]/90 border border-white/10 rounded-2xl p-4 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-white flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 text-red-400" />
+                    <span>Your Real Voice Recording</span>
+                  </label>
+                  {recordedAudioUrl && (
+                    <button
+                      type="button"
+                      onClick={deleteRecording}
+                      className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Clear</span>
+                    </button>
+                  )}
+                </div>
+
+                {!recordedAudioUrl ? (
+                  <div className="space-y-3">
+                    {/* Live Mic Record Button */}
+                    {isRecording ? (
+                      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-center space-y-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
+                          <span className="text-xs font-semibold text-red-400">
+                            Recording Voice ({formatSeconds(recordingSeconds)})
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-300">
+                          Speak clearly into your microphone...
+                        </p>
+                        <button
+                          type="button"
+                          onClick={stopRecording}
+                          className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-medium text-xs transition-all shadow-lg cursor-pointer"
+                        >
+                          <Square className="w-3.5 h-3.5 fill-white" />
+                          <span>Stop Recording</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-red-600/20 to-[#7C4AED]/20 hover:from-red-600/30 hover:to-[#7C4AED]/30 text-white border border-red-500/30 hover:border-red-500/50 py-3.5 rounded-xl font-medium text-xs transition-all cursor-pointer group"
+                      >
+                        <div className="w-3 h-3 rounded-full bg-red-500 group-hover:scale-125 transition-transform" />
+                        <span>Click to Record Voice (Mic)</span>
+                      </button>
+                    )}
+
+                    <div className="flex items-center gap-2 text-gray-500 text-[10px]">
+                      <div className="h-px bg-white/10 flex-1" />
+                      <span>OR UPLOAD AUDIO</span>
+                      <div className="h-px bg-white/10 flex-1" />
+                    </div>
+
+                    {/* Upload Audio Button */}
+                    <button
+                      type="button"
+                      onClick={() => audioFileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 bg-[#0B0C1E] hover:bg-[#7C4AED]/10 text-gray-300 hover:text-white border border-white/10 hover:border-[#7C4AED]/40 py-2.5 rounded-xl font-medium text-xs transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-[#A78BFA]" />
+                      <span>Upload Audio File (.mp3, .wav, .m4a)</span>
+                    </button>
+                  </div>
+                ) : (
+                  /* Audio Preview Player */
+                  <div className="p-3.5 rounded-xl bg-[#0B0C1E] border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <button
+                          type="button"
+                          onClick={toggleAudioPreview}
+                          className="w-8 h-8 rounded-full bg-[#7C4AED] hover:bg-[#6D39D2] text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-md"
+                        >
+                          {isPlayingAudio ? (
+                            <Pause className="w-4 h-4 fill-white" />
+                          ) : (
+                            <Play className="w-4 h-4 fill-white translate-x-0.5" />
+                          )}
+                        </button>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-white truncate">
+                            {recordedAudioName}
+                          </p>
+                          <p className="text-[10px] text-[#A78BFA]">
+                            {isPlayingAudio ? "Playing preview..." : "Ready for animation"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={deleteRecording}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Delete and re-record"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Avatar will animate & lip-sync directly to this voice recording!</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 4. Generate Button */}
             <button
@@ -500,7 +984,11 @@ function AvatarStudioContent() {
               ) : (
                 <>
                   <FileVideo className="w-4 h-4" />
-                  <span>Generate Talking Avatar Video</span>
+                  <span>
+                    {audioMode === "voice"
+                      ? "Generate Avatar with Your Voice"
+                      : "Generate Talking Avatar Video"}
+                  </span>
                 </>
               )}
             </button>

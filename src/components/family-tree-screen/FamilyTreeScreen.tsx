@@ -35,6 +35,10 @@ import {
   ExternalLink,
   Volume2,
   VolumeX,
+  Link as LinkIcon,
+  Unlink,
+  UserCheck,
+  AtSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getStoredToken } from "@/utils/tokenHandler";
@@ -55,6 +59,9 @@ export interface FamilyMember {
   avatarVideoUrl?: string;
   avatarScript?: string;
   tributesCount?: number;
+  linkedUserId?: string;
+  linkedUserEmail?: string;
+  isLinkedUser?: boolean;
   spouseId?: string;
   fatherId?: string;
   motherId?: string;
@@ -306,6 +313,74 @@ export const FamilyTreeScreen = () => {
   const [formPhotoUrl, setFormPhotoUrl] = useState("");
   const [formAvatarVideoUrl, setFormAvatarVideoUrl] = useState("");
   const [formAvatarScript, setFormAvatarScript] = useState("");
+
+  // Linked Akasha User state
+  const [formLinkedUserId, setFormLinkedUserId] = useState("");
+  const [formLinkedUserEmail, setFormLinkedUserEmail] = useState("");
+  const [formIsLinkedUser, setFormIsLinkedUser] = useState(false);
+  const [userSearchEmail, setUserSearchEmail] = useState("");
+  const [isSearchingUser, setIsSearchingUser] = useState(false);
+  const [foundUserPreview, setFoundUserPreview] = useState<{
+    id: string;
+    email: string;
+    name: string;
+    photoUrl?: string;
+    bio?: string;
+    avatarVideoUrl?: string;
+    avatarScript?: string;
+    hasAvatar?: boolean;
+  } | null>(null);
+
+  const handleSearchUser = async (emailToSearch: string) => {
+    const clean = emailToSearch.trim();
+    if (!clean) {
+      toast.error("Please enter an email address to search.");
+      return;
+    }
+    setIsSearchingUser(true);
+    try {
+      const token = getStoredToken();
+      const res = await fetch(`${API_BASE_URL}/family-tree/search-user?email=${encodeURIComponent(clean)}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.found && data.user) {
+        const u = data.user;
+        setFoundUserPreview(u);
+        setFormLinkedUserId(u.id);
+        setFormLinkedUserEmail(u.email);
+        setFormIsLinkedUser(true);
+
+        // Auto-fill form fields
+        if (u.name) setFormName(u.name);
+        if (u.photoUrl) setFormPhotoUrl(u.photoUrl);
+        if (u.bio) setFormBio(u.bio);
+        if (u.avatarVideoUrl) setFormAvatarVideoUrl(u.avatarVideoUrl);
+        if (u.avatarScript) setFormAvatarScript(u.avatarScript);
+
+        toast.success(`Found registered user: ${u.name}! Details auto-filled.`);
+      } else {
+        setFoundUserPreview(null);
+        toast.info(data.message || `No registered Akasha account found with ${clean}. You can still add details manually.`);
+      }
+    } catch (err) {
+      console.error("Error searching user:", err);
+      toast.error("Failed to connect to search service.");
+    } finally {
+      setIsSearchingUser(false);
+    }
+  };
+
+  const handleUnlinkUser = () => {
+    setFormLinkedUserId("");
+    setFormLinkedUserEmail("");
+    setFormIsLinkedUser(false);
+    setFoundUserPreview(null);
+    setUserSearchEmail("");
+    toast.info("Unlinked Akasha user.");
+  };
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -630,6 +705,11 @@ export const FamilyTreeScreen = () => {
     setFormPhotoUrl("");
     setFormAvatarVideoUrl("");
     setFormAvatarScript("");
+    setFormLinkedUserId("");
+    setFormLinkedUserEmail("");
+    setFormIsLinkedUser(false);
+    setUserSearchEmail("");
+    setFoundUserPreview(null);
     
     setIsAddModalOpen(true);
   };
@@ -669,6 +749,9 @@ export const FamilyTreeScreen = () => {
       photoUrl: formPhotoUrl || undefined,
       avatarVideoUrl: formAvatarVideoUrl || undefined,
       avatarScript: formAvatarScript || undefined,
+      linkedUserId: formLinkedUserId || undefined,
+      linkedUserEmail: formLinkedUserEmail || undefined,
+      isLinkedUser: formIsLinkedUser || undefined,
       tributesCount: 0,
       x: newX,
       y: newY
@@ -752,6 +835,9 @@ export const FamilyTreeScreen = () => {
           photoUrl: formPhotoUrl || undefined,
           avatarVideoUrl: formAvatarVideoUrl || undefined,
           avatarScript: formAvatarScript || undefined,
+          linkedUserId: formLinkedUserId || undefined,
+          linkedUserEmail: formLinkedUserEmail || undefined,
+          isLinkedUser: formIsLinkedUser || undefined,
         };
       }
       return node;
@@ -775,6 +861,24 @@ export const FamilyTreeScreen = () => {
     setFormPhotoUrl(selectedNode.photoUrl || "");
     setFormAvatarVideoUrl(selectedNode.avatarVideoUrl || "");
     setFormAvatarScript(selectedNode.avatarScript || "");
+    setFormLinkedUserId(selectedNode.linkedUserId || "");
+    setFormLinkedUserEmail(selectedNode.linkedUserEmail || "");
+    setFormIsLinkedUser(Boolean(selectedNode.isLinkedUser));
+    setUserSearchEmail(selectedNode.linkedUserEmail || "");
+    if (selectedNode.isLinkedUser && selectedNode.linkedUserEmail) {
+      setFoundUserPreview({
+        id: selectedNode.linkedUserId || "",
+        email: selectedNode.linkedUserEmail,
+        name: selectedNode.name,
+        photoUrl: selectedNode.photoUrl,
+        bio: selectedNode.bio,
+        avatarVideoUrl: selectedNode.avatarVideoUrl,
+        avatarScript: selectedNode.avatarScript,
+        hasAvatar: Boolean(selectedNode.avatarVideoUrl),
+      });
+    } else {
+      setFoundUserPreview(null);
+    }
     setIsEditMode(true);
   };
 
@@ -1436,6 +1540,15 @@ export const FamilyTreeScreen = () => {
                             🕊️
                           </span>
                         )}
+                        {node.isLinkedUser && (
+                          <span
+                            className="shrink-0 text-[8px] font-bold text-sky-300 bg-sky-500/20 border border-sky-400/30 px-1 py-0.2 rounded-md flex items-center gap-0.5"
+                            title={`Registered Akasha User: ${node.linkedUserEmail || ""}`}
+                          >
+                            <LinkIcon className="w-2 h-2" />
+                            <span>User</span>
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
                         {node.occupation || "Relative"}
@@ -1558,6 +1671,14 @@ export const FamilyTreeScreen = () => {
                       <p className="text-xs text-[#C5FF41] font-medium font-mono uppercase tracking-wider bg-[#C5FF41]/10 inline-block px-2.5 py-0.5 rounded-full">
                         {selectedNode.gender}
                       </p>
+                      {selectedNode.isLinkedUser && (
+                        <div className="pt-1">
+                          <span className="text-[11px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                            <UserCheck className="w-3 h-3 text-sky-400" />
+                            <span>Connected: {selectedNode.linkedUserEmail}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1841,6 +1962,79 @@ export const FamilyTreeScreen = () => {
               ) : (
                 // Edit Mode Form
                 <form onSubmit={handleEditMemberSubmit} className="space-y-4">
+                  {/* Link Akasha User by Email */}
+                  <div className="p-3.5 rounded-xl bg-slate-900/90 border border-sky-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-sky-300 flex items-center gap-1.5 uppercase tracking-wider">
+                        <AtSign className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Link Akasha User (Optional)</span>
+                      </label>
+                      {formIsLinkedUser && (
+                        <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+                          Connected
+                        </span>
+                      )}
+                    </div>
+
+                    {!formIsLinkedUser ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={userSearchEmail}
+                          onChange={(e) => setUserSearchEmail(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSearchUser(userSearchEmail);
+                            }
+                          }}
+                          placeholder="relative@example.com"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSearchUser(userSearchEmail)}
+                          disabled={isSearchingUser}
+                          className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
+                        >
+                          {isSearchingUser ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Search className="w-3.5 h-3.5" />
+                          )}
+                          <span>Link</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-sky-950/40 border border-sky-500/40 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg overflow-hidden bg-sky-900 flex items-center justify-center font-bold text-xs text-white shrink-0">
+                            {formPhotoUrl ? (
+                              <img src={formPhotoUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              formName.charAt(0) || "U"
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-white truncate">{formName}</p>
+                            <p className="text-[10px] text-sky-300 truncate">{formLinkedUserEmail}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleUnlinkUser}
+                          className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-red-400 text-xs transition-colors shrink-0"
+                          title="Unlink User"
+                        >
+                          <Unlink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-slate-400">
+                      Link their registered account to auto-sync their portrait and 3D voice avatar.
+                    </p>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">Full Name</label>
                     <input
@@ -2004,6 +2198,79 @@ export const FamilyTreeScreen = () => {
               </div>
 
               <form onSubmit={submitAddRelation} className="p-6 space-y-4">
+                {/* Link Akasha User by Email */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5 uppercase tracking-wider">
+                      <AtSign className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Link Registered Akasha User (Optional)</span>
+                    </label>
+                    {formIsLinkedUser && (
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+                        Connected
+                      </span>
+                    )}
+                  </div>
+
+                  {!formIsLinkedUser ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={userSearchEmail}
+                        onChange={(e) => setUserSearchEmail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSearchUser(userSearchEmail);
+                          }
+                        }}
+                        placeholder="relative@example.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSearchUser(userSearchEmail)}
+                        disabled={isSearchingUser}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
+                      >
+                        {isSearchingUser ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Search className="w-3.5 h-3.5" />
+                        )}
+                        <span>Find User</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-indigo-900 flex items-center justify-center font-bold text-xs text-white shrink-0">
+                          {formPhotoUrl ? (
+                            <img src={formPhotoUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            formName.charAt(0) || "U"
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white truncate">{formName}</p>
+                          <p className="text-[10px] text-indigo-300 truncate">{formLinkedUserEmail}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleUnlinkUser}
+                        className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-red-400 text-xs transition-colors shrink-0"
+                        title="Unlink User"
+                      >
+                        <Unlink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400">
+                    If this relative has an Akasha account, enter their email to auto-sync their profile, photo, and 3D voice avatar.
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">Full Name</label>
                   <input
